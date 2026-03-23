@@ -1,0 +1,5 @@
+.venv/
+.tmp/
+__pycache__/
+*.pyc
+django_backend/db.sqlite3

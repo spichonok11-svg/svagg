@@ -1,0 +1,222 @@
+[
+  {
+    "id": "kavkaz-01",
+    "title": "Архыз: горный weekend",
+    "region": "Карачаево-Черкесия",
+    "country": "Россия",
+    "pricePerPerson": 5000,
+    "days": 3,
+    "categories": ["with_hotel", "with_pool", "mountains", "family"],
+    "description": "Короткая поездка в горы с проживанием и трансфером.",
+    "link": "https://example.org/tours/kavkaz-01"
+  },
+  {
+    "id": "altai-02",
+    "title": "Алтай: лес и река",
+    "region": "Республика Алтай",
+    "country": "Россия",
+    "pricePerPerson": 5500,
+    "days": 4,
+    "categories": ["without_hotel", "without_pool", "forest", "waterfront"],
+    "description": "Эко-маршрут с базовым размещением в домиках.",
+    "link": "https://example.org/tours/altai-02"
+  },
+  {
+    "id": "karelia-03",
+    "title": "Карелия: базы отдыха у озера",
+    "region": "Республика Карелия",
+    "country": "Россия",
+    "pricePerPerson": 6000,
+    "days": 4,
+    "categories": ["with_hotel", "without_pool", "forest", "recreation_base", "waterfront"],
+    "description": "Тихий отдых у озер с баней и прогулками.",
+    "link": "https://example.org/tours/karelia-03"
+  },
+  {
+    "id": "sochi-04",
+    "title": "Сочи: море и все включено",
+    "region": "Краснодарский край",
+    "country": "Россия",
+    "pricePerPerson": 6500,
+    "days": 5,
+    "categories": ["with_hotel", "with_pool", "waterfront", "all_inclusive", "family"],
+    "description": "Пляжный отдых с питанием и бассейном.",
+    "link": "https://example.org/tours/sochi-04"
+  },
+  {
+    "id": "adigea-05",
+    "title": "Адыгея: активные горные тропы",
+    "region": "Республика Адыгея",
+    "country": "Россия",
+    "pricePerPerson": 7000,
+    "days": 5,
+    "categories": ["without_hotel", "without_pool", "mountains", "forest"],
+    "description": "Пешие маршруты и природные смотровые площадки.",
+    "link": "https://example.org/tours/adigea-05"
+  },
+  {
+    "id": "baikal-06",
+    "title": "Байкал: турбаза на берегу",
+    "region": "Иркутская область",
+    "country": "Россия",
+    "pricePerPerson": 7500,
+    "days": 5,
+    "categories": ["with_hotel", "without_pool", "recreation_base", "waterfront", "family"],
+    "description": "Поездка к Байкалу с проживанием на базе отдыха.",
+    "link": "https://example.org/tours/baikal-06"
+  },
+  {
+    "id": "elbrus-07",
+    "title": "Эльбрус: высота и снег",
+    "region": "Кабардино-Балкария",
+    "country": "Россия",
+    "pricePerPerson": 8000,
+    "days": 6,
+    "categories": ["with_hotel", "with_pool", "mountains", "all_inclusive"],
+    "description": "Горнолыжные активности и проживание в отеле.",
+    "link": "https://example.org/tours/elbrus-07"
+  },
+  {
+    "id": "valday-08",
+    "title": "Валдай: лесные базы отдыха",
+    "region": "Новгородская область",
+    "country": "Россия",
+    "pricePerPerson": 8500,
+    "days": 5,
+    "categories": ["with_hotel", "without_pool", "forest", "recreation_base", "family"],
+    "description": "Спокойный отдых среди хвойного леса.",
+    "link": "https://example.org/tours/valday-08"
+  },
+  {
+    "id": "kamchatka-09",
+    "title": "Камчатка: вулканы и океан",
+    "region": "Камчатский край",
+    "country": "Россия",
+    "pricePerPerson": 9000,
+    "days": 6,
+    "categories": ["without_hotel", "without_pool", "mountains", "waterfront"],
+    "description": "Экспедиционный тур к вулканам и побережью.",
+    "link": "https://example.org/tours/kamchatka-09"
+  },
+  {
+    "id": "gelendzhik-10",
+    "title": "Геленджик: семейный отпуск",
+    "region": "Краснодарский край",
+    "country": "Россия",
+    "pricePerPerson": 9500,
+    "days": 7,
+    "categories": ["with_hotel", "with_pool", "waterfront", "family", "all_inclusive"],
+    "description": "Курортный отдых у моря для семьи.",
+    "link": "https://example.org/tours/gelendzhik-10"
+  },
+  {
+    "id": "dagestan-11",
+    "title": "Дагестан: каньоны и горы",
+    "region": "Республика Дагестан",
+    "country": "Россия",
+    "pricePerPerson": 10000,
+    "days": 6,
+    "categories": ["without_hotel", "without_pool", "mountains", "family"],
+    "description": "Панорамные маршруты и исторические локации.",
+    "link": "https://example.org/tours/dagestan-11"
+  },
+  {
+    "id": "tver-12",
+    "title": "Тверская область: лесные каникулы",
+    "region": "Тверская область",
+    "country": "Россия",
+    "pricePerPerson": 7000,
+    "days": 4,
+    "categories": ["with_hotel", "with_pool", "forest", "recreation_base", "family"],
+    "description": "База отдыха с бассейном и детскими зонами.",
+    "link": "https://example.org/tours/tver-12"
+  },
+  {
+    "id": "rostov-13",
+    "title": "Донской отдых у воды",
+    "region": "Ростовская область",
+    "country": "Россия",
+    "pricePerPerson": 6500,
+    "days": 4,
+    "categories": ["with_hotel", "without_pool", "waterfront", "recreation_base"],
+    "description": "Речной отдых с рыбалкой и прогулками.",
+    "link": "https://example.org/tours/rostov-13"
+  },
+  {
+    "id": "ufa-14",
+    "title": "Башкирия: горы и лес",
+    "region": "Республика Башкортостан",
+    "country": "Россия",
+    "pricePerPerson": 8000,
+    "days": 5,
+    "categories": ["with_hotel", "without_pool", "mountains", "forest", "family"],
+    "description": "Смешанный маршрут по природным паркам.",
+    "link": "https://example.org/tours/ufa-14"
+  },
+  {
+    "id": "krasnaya-polyana-15",
+    "title": "Красная Поляна: premium неделя",
+    "region": "Краснодарский край",
+    "country": "Россия",
+    "pricePerPerson": 9500,
+    "days": 7,
+    "categories": ["with_hotel", "with_pool", "mountains", "all_inclusive"],
+    "description": "Комфортный отель и активные горные маршруты.",
+    "link": "https://example.org/tours/krasnaya-polyana-15"
+  },
+  {
+    "id": "seliger-16",
+    "title": "Селигер: база у озера",
+    "region": "Тверская область",
+    "country": "Россия",
+    "pricePerPerson": 5500,
+    "days": 3,
+    "categories": ["without_hotel", "without_pool", "recreation_base", "waterfront", "forest"],
+    "description": "Бюджетный отдых на природе с кемпингом.",
+    "link": "https://example.org/tours/seliger-16"
+  },
+  {
+    "id": "anapa-17",
+    "title": "Анапа: море и дети",
+    "region": "Краснодарский край",
+    "country": "Россия",
+    "pricePerPerson": 6000,
+    "days": 5,
+    "categories": ["with_hotel", "with_pool", "waterfront", "family"],
+    "description": "Курорт для семейного отдыха у моря.",
+    "link": "https://example.org/tours/anapa-17"
+  },
+  {
+    "id": "vladivostok-18",
+    "title": "Владивосток: побережье Приморья",
+    "region": "Приморский край",
+    "country": "Россия",
+    "pricePerPerson": 8500,
+    "days": 6,
+    "categories": ["with_hotel", "without_pool", "waterfront", "all_inclusive"],
+    "description": "Морской воздух, экскурсии и комфортный отель.",
+    "link": "https://example.org/tours/vladivostok-18"
+  },
+  {
+    "id": "perm-19",
+    "title": "Пермский край: лесной weekend",
+    "region": "Пермский край",
+    "country": "Россия",
+    "pricePerPerson": 5000,
+    "days": 3,
+    "categories": ["without_hotel", "without_pool", "forest", "recreation_base"],
+    "description": "Недорогая поездка на выходные.",
+    "link": "https://example.org/tours/perm-19"
+  },
+  {
+    "id": "sakhalin-20",
+    "title": "Сахалин: океан и природа",
+    "region": "Сахалинская область",
+    "country": "Россия",
+    "pricePerPerson": 10000,
+    "days": 7,
+    "categories": ["with_hotel", "without_pool", "waterfront", "family", "all_inclusive"],
+    "description": "Дальний Восток с насыщенной программой.",
+    "link": "https://example.org/tours/sakhalin-20"
+  }
+]
