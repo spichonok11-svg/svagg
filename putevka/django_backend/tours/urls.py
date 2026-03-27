@@ -8,8 +8,9 @@ urlpatterns = [
     path("api/categories", views.categories, name="categories"),
     path("api/price-options", views.price_options, name="price-options"),
     path("api/cities", views.cities, name="cities"),
+    path("api/search-suggestions", views.search_suggestions, name="search-suggestions"),
     path("api/tours", views.tours, name="tours"),
     path("api/parse", views.parse, name="parse"),
     path("", views.index, name="index"),
-    re_path(r"^(?!api/).*$", views.index, name="spa-fallback"),
+    re_path(r"^(?!(api|static)/).*$", views.index, name="spa-fallback"),
 ]

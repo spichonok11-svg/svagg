@@ -1,90 +1,414 @@
-import React, { useEffect, useMemo, useRef, useState } from "https://esm.sh/react@18.2.0";
+import React, {
+  startTransition,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "https://esm.sh/react@18.2.0";
 import { createRoot } from "https://esm.sh/react-dom@18.2.0/client";
+import htm from "https://esm.sh/htm@3.1.1";
 
-const h = React.createElement;
-const currency = new Intl.NumberFormat("ru-RU");
-const PAGE_SIZE = 12;
+const html = htm.bind(React.createElement);
+const PAGE_SIZE = 24;
+const NIGHT_OPTIONS = [3, 5, 7, 10, 14];
+const PEOPLE_OPTIONS = [1, 2, 3, 4, 5, 6];
 const SORT_OPTIONS = [
-  { value: "price_asc", label: "Сначала дешевые" },
-  { value: "price_desc", label: "Сначала дорогие" },
-  { value: "days_asc", label: "Сначала короткие" },
-  { value: "days_desc", label: "Сначала длинные" },
+  { value: "price_asc" },
+  { value: "price_desc" },
+  { value: "days_asc" },
+  { value: "days_desc" },
 ];
+const CATEGORY_COPY = {
+  with_hotel: {
+    ru: { label: "С отелем", description: "Размещение в отеле включено" },
+    eu: { label: "With hotel", description: "Hotel stay included" },
+  },
+  without_hotel: {
+    ru: { label: "Без отеля", description: "Только программа отдыха без отеля" },
+    eu: { label: "No hotel", description: "Travel plan without hotel stay" },
+  },
+  with_pool: {
+    ru: { label: "С бассейном", description: "Есть бассейн на территории" },
+    eu: { label: "With pool", description: "Pool available on site" },
+  },
+  without_pool: {
+    ru: { label: "Без бассейна", description: "Без бассейна на территории" },
+    eu: { label: "No pool", description: "No pool on site" },
+  },
+  mountains: {
+    ru: { label: "Горы", description: "Горные маршруты и локации" },
+    eu: { label: "Mountains", description: "Mountain routes and locations" },
+  },
+  forest: {
+    ru: { label: "Лес", description: "Лесные направления и эко-туризм" },
+    eu: { label: "Forest", description: "Forest routes and eco travel" },
+  },
+  recreation_base: {
+    ru: { label: "Базы отдыха", description: "Отдых на базах и турбазах" },
+    eu: { label: "Recreation bases", description: "Resort bases and lodges" },
+  },
+  waterfront: {
+    ru: { label: "У воды", description: "Рядом море, озеро или река" },
+    eu: { label: "By water", description: "Near sea, lake or river" },
+  },
+  family: {
+    ru: { label: "Семейный", description: "Подходит для поездки с детьми" },
+    eu: { label: "Family", description: "Good for trips with children" },
+  },
+  all_inclusive: {
+    ru: { label: "Все включено", description: "Питание и часть активностей включены" },
+    eu: { label: "All inclusive", description: "Meals and part of activities included" },
+  },
+};
+const TRANSLIT_MAP = {
+  А: "A", а: "a", Б: "B", б: "b", В: "V", в: "v", Г: "G", г: "g",
+  Д: "D", д: "d", Е: "E", е: "e", Ё: "Yo", ё: "yo", Ж: "Zh", ж: "zh",
+  З: "Z", з: "z", И: "I", и: "i", Й: "Y", й: "y", К: "K", к: "k",
+  Л: "L", л: "l", М: "M", м: "m", Н: "N", н: "n", О: "O", о: "o",
+  П: "P", п: "p", Р: "R", р: "r", С: "S", с: "s", Т: "T", т: "t",
+  У: "U", у: "u", Ф: "F", ф: "f", Х: "Kh", х: "kh", Ц: "Ts", ц: "ts",
+  Ч: "Ch", ч: "ch", Ш: "Sh", ш: "sh", Щ: "Sch", щ: "sch", Ъ: "", ъ: "",
+  Ы: "Y", ы: "y", Ь: "", ь: "", Э: "E", э: "e", Ю: "Yu", ю: "yu",
+  Я: "Ya", я: "ya",
+};
+const COPY = {
+  ru: {
+    title: "Путевки по России",
+    eyebrow: "маршрут отдыха",
+    calm: "спокойный режим",
+    heroCopy:
+      "Удобный каталог с живым поиском, быстрыми подсказками и спокойной навигацией по направлениям без визуальной каши.",
+    variants: "вариантов",
+    averagePrice: "средняя цена",
+    trip: "поездка",
+    flow: "поток выдачи",
+    launchSearch: "запустить поиск",
+    updating: "обновляем",
+    source: "источник",
+    updated: "обновлено",
+    minimum: "минимум",
+    maximum: "максимум",
+    liveNote: (count) => `Каталог уже показывает ${count} реальных вариантов и продолжает догружаться в фоне.`,
+    stableNote: "Выдача сейчас стабильна. Можно сузить поиск или запустить новый проход.",
+    searchLabel: "что ищем",
+    cityLabel: "город",
+    priceLabel: "цена",
+    nightsLabel: "ночей",
+    peopleLabel: "людей",
+    sortLabel: "сортировка",
+    anyPrice: "любая",
+    searchPlaceholder: "море, spa, горы",
+    cityPlaceholder: "Сочи, Саки, Белокуриха",
+    searchAction: "искать",
+    resetAction: "сбросить",
+    hints: "подсказки",
+    hintsLoading: "подбираем запросы",
+    cities: "города",
+    citiesLoading: "собираем города",
+    chosen: "вы выбрали",
+    navigator: "Навигатор",
+    allCategories: "все категории",
+    activeCategories: (count) => `${count} активных`,
+    plan: "План отдыха",
+    concise: "без лишнего текста",
+    duration: "длительность",
+    party: "состав",
+    start: "старт",
+    averageBill: "средний чек",
+    destinations: "Направления",
+    destinationHint: "живые счётчики по текущим фильтрам",
+    results: "вариантов",
+    cityAll: "город: все",
+    cityOne: (city) => `город: ${city}`,
+    page: (current, total) => `страница ${current} из ${total}`,
+    tripMeta: (nights, people) => `${nights} ночей · ${people} чел.`,
+    tile: "плитка",
+    list: "лента",
+    noOptions: "Подходящих вариантов нет. Попробуйте убрать часть фильтров или выбрать другой город.",
+    pulse: "Пульс",
+    searching: "поиск идёт",
+    done: "поиск завершён",
+    inCatalog: "в каталоге",
+    regions: "Регионы",
+    regionsHint: "куда быстрее перейти",
+    typeSlice: "Срез по типам",
+    typeHint: "самое частое в выдаче",
+    back: "назад",
+    forward: "вперёд",
+    open: "открыть",
+    exactPrice: "точная цена с сайта",
+    sort: {
+      price_asc: "Дешевле",
+      price_desc: "Дороже",
+      days_asc: "Короче",
+      days_desc: "Дольше",
+    },
+    stage: {
+      queued: "сбор",
+      seed: "первая волна",
+      regions: "по регионам",
+      details: "детализация",
+      idle: "готово",
+      error: "ошибка",
+    },
+    themeDay: "День",
+    themeNight: "Ночь",
+  },
+  eu: {
+    title: "Putevki Across Russia",
+    eyebrow: "travel route",
+    calm: "steady mode",
+    heroCopy:
+      "A calmer catalog with live search, quick hints and a cleaner route through destinations instead of visual noise.",
+    variants: "offers",
+    averagePrice: "average price",
+    trip: "trip plan",
+    flow: "live stream",
+    launchSearch: "run search",
+    updating: "updating",
+    source: "source",
+    updated: "updated",
+    minimum: "minimum",
+    maximum: "maximum",
+    liveNote: (count) => `The catalog already shows ${count} real offers and keeps loading more in the background.`,
+    stableNote: "The feed is stable now. You can narrow the search or start a fresh pass.",
+    searchLabel: "search",
+    cityLabel: "city",
+    priceLabel: "price",
+    nightsLabel: "nights",
+    peopleLabel: "people",
+    sortLabel: "sorting",
+    anyPrice: "any",
+    searchPlaceholder: "sea, spa, mountains",
+    cityPlaceholder: "Sochi, Saki, Belokurikha",
+    searchAction: "search",
+    resetAction: "reset",
+    hints: "suggestions",
+    hintsLoading: "finding ideas",
+    cities: "cities",
+    citiesLoading: "loading cities",
+    chosen: "selected",
+    navigator: "Navigator",
+    allCategories: "all categories",
+    activeCategories: (count) => `${count} active`,
+    plan: "Trip plan",
+    concise: "short view",
+    duration: "duration",
+    party: "party",
+    start: "entry point",
+    averageBill: "average bill",
+    destinations: "Destinations",
+    destinationHint: "live counts for the current filters",
+    results: "offers",
+    cityAll: "city: all",
+    cityOne: (city) => `city: ${city}`,
+    page: (current, total) => `page ${current} of ${total}`,
+    tripMeta: (nights, people) => `${nights} nights · ${people} guests`,
+    tile: "grid",
+    list: "list",
+    noOptions: "No matching offers. Try removing some filters or switch the city.",
+    pulse: "Pulse",
+    searching: "search in progress",
+    done: "search complete",
+    inCatalog: "in catalog",
+    regions: "Regions",
+    regionsHint: "quick jumps",
+    typeSlice: "Type mix",
+    typeHint: "most common in the feed",
+    back: "back",
+    forward: "next",
+    open: "open",
+    exactPrice: "exact price from site",
+    sort: {
+      price_asc: "Cheaper first",
+      price_desc: "Pricier first",
+      days_asc: "Shorter first",
+      days_desc: "Longer first",
+    },
+    stage: {
+      queued: "queued",
+      seed: "first wave",
+      regions: "regions",
+      details: "details",
+      idle: "ready",
+      error: "error",
+    },
+    themeDay: "Day",
+    themeNight: "Night",
+  },
+};
+const normalizeText = (value) => String(value || "").trim().toLowerCase();
+const progressRatio = (count, active) => (active ? Math.min(0.94, 0.14 + Math.log10((count || 0) + 1) * 0.22) : count ? 1 : 0);
+const transliterateText = (value) => String(value || "").split("").map((char) => TRANSLIT_MAP[char] ?? char).join("");
 
-function formatPrice(value) {
-  return `${currency.format(Number(value))} ₽/чел`;
+function getCategoryContent(categoryId, localeMode, fallback = {}) {
+  const localized = CATEGORY_COPY[categoryId]?.[localeMode];
+  if (localized) return localized;
+  return {
+    label: localeMode === "eu" ? transliterateText(fallback.label || categoryId) : fallback.label || categoryId,
+    description: localeMode === "eu" ? transliterateText(fallback.description || "") : fallback.description || "",
+  };
 }
 
-function formatDate(value) {
-  if (!value) {
-    return "не обновлялось";
+function localizePlaceFragment(value, localeMode) {
+  const safe = String(value || "").trim();
+  if (!safe || localeMode !== "eu") return safe;
+  if (safe === "Россия") return "Russia";
+  if (/^Республика\s+.+$/i.test(safe)) {
+    return safe.replace(/^Республика\s+(.+)$/i, (_, name) => `Republic of ${transliterateText(name)}`);
   }
-  return new Date(value).toLocaleString("ru-RU");
+  if (/^.+\s+область$/i.test(safe)) {
+    return safe.replace(/^(.+)\s+область$/i, (_, name) => `${transliterateText(name)} Oblast`);
+  }
+  if (/^.+\s+край$/i.test(safe)) {
+    return safe.replace(/^(.+)\s+край$/i, (_, name) => `${transliterateText(name)} Krai`);
+  }
+  if (/^.+\s+озеро$/i.test(safe)) {
+    return safe.replace(/^(.+)\s+озеро$/i, (_, name) => `${transliterateText(name)} Lake`);
+  }
+  if (/^озеро\s+.+$/i.test(safe)) {
+    return safe.replace(/^озеро\s+(.+)$/i, (_, name) => `${transliterateText(name)} Lake`);
+  }
+  return transliterateText(safe);
+}
+
+function localizePlaceText(value, localeMode) {
+  const safe = String(value || "").trim();
+  if (!safe || localeMode !== "eu") return safe;
+  return safe
+    .split(",")
+    .map((part) => localizePlaceFragment(part, localeMode))
+    .join(", ");
 }
 
 function buildPageTokens(currentPage, totalPages) {
-  if (totalPages <= 7) {
-    return Array.from({ length: totalPages }, (_, index) => index + 1);
-  }
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
   const tokens = [1];
   const start = Math.max(2, currentPage - 1);
   const end = Math.min(totalPages - 1, currentPage + 1);
-  if (start > 2) {
-    tokens.push("...");
-  }
-  for (let page = start; page <= end; page += 1) {
-    tokens.push(page);
-  }
-  if (end < totalPages - 1) {
-    tokens.push("...");
-  }
+  if (start > 2) tokens.push("...");
+  for (let page = start; page <= end; page += 1) tokens.push(page);
+  if (end < totalPages - 1) tokens.push("...");
   tokens.push(totalPages);
   return tokens;
 }
 
-function tourDescription(tour) {
-  const text = String(tour.description || "").trim();
-  if (!text || text.startsWith("Актуальная путевка")) {
-    return `Комфортный отдых в регионе ${tour.region}. Бронирование по актуальной цене.`;
-  }
-  return text;
+function formatNightWord(value, localeMode) {
+  const nights = Math.max(Number(value || 0), 1);
+  if (localeMode !== "ru") return nights === 1 ? "night" : "nights";
+  const mod10 = nights % 10;
+  const mod100 = nights % 100;
+  if (mod10 === 1 && mod100 !== 11) return "ночь";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "ночи";
+  return "ночей";
+}
+
+function formatMinNights(value, localeMode) {
+  const nights = Math.max(Number(value || 0), 1);
+  return localeMode === "ru"
+    ? `от ${nights} ${formatNightWord(nights, localeMode)}`
+    : `from ${nights} ${formatNightWord(nights, localeMode)}`;
 }
 
 function App() {
   const shellRef = useRef(null);
+  const liveSyncRef = useRef(false);
+  const pollTickRef = useRef(0);
   const [categories, setCategories] = useState([]);
   const [priceOptions, setPriceOptions] = useState([]);
-  const [popularCities, setPopularCities] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [quickCities, setQuickCities] = useState([]);
   const [citySuggestions, setCitySuggestions] = useState([]);
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [filters, setFilters] = useState({ query: "", city: "", price: "", sort: "price_asc", categories: [] });
+  const [searchInput, setSearchInput] = useState("");
   const [cityInput, setCityInput] = useState("");
-  const [selectedCity, setSelectedCity] = useState("");
-  const [isCityLoading, setIsCityLoading] = useState(false);
-  const [selectedCategories, setSelectedCategories] = useState([]);
-  const [selectedPrice, setSelectedPrice] = useState("");
-  const [sort, setSort] = useState("price_asc");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [planner, setPlanner] = useState({ nights: 7, people: 2 });
   const [viewMode, setViewMode] = useState("grid");
+  const [localeMode, setLocaleMode] = useState("ru");
+  const [currentPage, setCurrentPage] = useState(1);
   const [tours, setTours] = useState([]);
   const [count, setCount] = useState(0);
   const [lastParsedAt, setLastParsedAt] = useState(null);
   const [isReady, setIsReady] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isStartingRefresh, setIsStartingRefresh] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isCityLoading, setIsCityLoading] = useState(false);
+  const [isSearchLoading, setIsSearchLoading] = useState(false);
+  const [refreshStage, setRefreshStage] = useState("");
   const [error, setError] = useState("");
+
+  const deferredCityInput = useDeferredValue(cityInput);
+  const deferredSearchInput = useDeferredValue(searchInput);
+  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
+  const pageTokens = useMemo(() => buildPageTokens(currentPage, totalPages), [currentPage, totalPages]);
+  const displayText = (value) => localizePlaceText(value, localeMode);
+  const categoryMap = useMemo(
+    () =>
+      new Map(
+        categories.map((item) => [item.id, getCategoryContent(item.id, localeMode, item).label])
+      ),
+    [categories, localeMode]
+  );
+  const topCategoryRows = useMemo(
+    () =>
+      Object.entries(stats?.categoryCounts || {})
+        .map(([id, total]) => ({ id, label: categoryMap.get(id) || id, total }))
+        .sort((left, right) => right.total - left.total)
+        .slice(0, 6),
+    [categoryMap, stats]
+  );
+  const copy = COPY[localeMode];
+  const localeCode = localeMode === "ru" ? "ru-RU" : "en-IE";
+  const numberFormatter = useMemo(() => new Intl.NumberFormat(localeCode), [localeCode]);
+  const moneyFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat(localeCode, {
+        style: "currency",
+        currency: "RUB",
+        maximumFractionDigits: 0,
+      }),
+    [localeCode]
+  );
+  const formatPrice = (value) => `${moneyFormatter.format(Number(value || 0))}/${localeMode === "ru" ? "чел" : "guest"}`;
+  const formatMoney = (value) => moneyFormatter.format(Number(value || 0));
+  const formatDate = (value) => (value ? new Date(value).toLocaleString(localeCode) : localeMode === "ru" ? "ещё не обновлялось" : "not updated yet");
+  const sortOptions = SORT_OPTIONS.map((option) => ({
+    ...option,
+    label: copy.sort[option.value],
+  }));
+
+  const visibleCities = (deferredCityInput.trim() ? citySuggestions : quickCities).slice(0, 12);
+  const visibleQueries = deferredSearchInput.trim() ? searchSuggestions.slice(0, 10) : [];
+  const progressPercent = `${Math.round(progressRatio(count, isRefreshing) * 100)}%`;
+  const liveStageLabel = copy.stage[refreshStage] || (localeMode === "ru" ? "поиск" : "search");
+  const sourceLabel = stats?.cacheSource === "live_putevka_partial" ? "live partial" : stats?.cacheSource || "snapshot";
+  const plannerMinBudget = stats?.priceMin ? stats.priceMin * planner.people * planner.nights : null;
+  const plannerAverageBudget = stats?.priceAvg ? stats.priceAvg * planner.people * planner.nights : null;
+  const activeFilters = [
+    ...(filters.city ? [{ key: "city", label: displayText(filters.city), onClick: () => applyCity("") }] : []),
+    ...(filters.query ? [{ key: "query", label: filters.query, onClick: clearQuery }] : []),
+    ...(filters.price ? [{ key: "price", label: formatPrice(filters.price), onClick: clearPrice }] : []),
+    ...filters.categories.map((id) => ({ key: id, label: categoryMap.get(id) || id, onClick: () => toggleCategory(id) })),
+  ];
 
   useEffect(() => {
     async function bootstrap() {
       try {
-        const [categoriesRes, pricesRes] = await Promise.all([
-          fetch("/api/categories"),
-          fetch("/api/price-options"),
-        ]);
-        if (!categoriesRes.ok || !pricesRes.ok) {
-          throw new Error("Не удалось загрузить фильтры");
-        }
+        const [categoriesRes, pricesRes, statsRes] = await Promise.all([fetch("/api/categories"), fetch("/api/price-options"), fetch("/api/stats")]);
+        if (!categoriesRes.ok || !pricesRes.ok || !statsRes.ok) throw new Error("Не удалось загрузить стартовые данные");
         const categoriesPayload = await categoriesRes.json();
         const pricesPayload = await pricesRes.json();
+        const statsPayload = await statsRes.json();
         setCategories(categoriesPayload.categories || []);
         setPriceOptions(pricesPayload.options || []);
+        setStats(statsPayload);
+        setCount(Number(statsPayload.totalTours || 0));
+        setLastParsedAt(statsPayload.lastParsedAt || null);
+        setIsRefreshing(Boolean(statsPayload.isRefreshing));
+        setRefreshStage(statsPayload.refreshStage || "");
         setIsReady(true);
       } catch (bootstrapError) {
         setError(bootstrapError.message || "Ошибка запуска");
@@ -93,585 +417,364 @@ function App() {
     bootstrap();
   }, []);
 
-  useEffect(() => {
-    if (!isReady) {
-      return;
-    }
-    loadTours();
-  }, [isReady, selectedCategories, selectedPrice, selectedCity, sort, currentPage]);
+  useEffect(() => { if (isReady) loadTours(); }, [isReady, filters, currentPage]);
+  useEffect(() => { if (isReady) loadQuickCities(); }, [isReady, filters.query, filters.price, filters.categories]);
 
   useEffect(() => {
-    if (!isReady) {
-      return;
-    }
+    if (!isReady) return;
     let ignore = false;
-    async function loadPopularCities() {
-      try {
-        const response = await fetch("/api/cities?limit=12");
-        if (!response.ok) {
-          return;
-        }
-        const payload = await response.json();
-        if (!ignore) {
-          setPopularCities(payload.cities || []);
-        }
-      } catch (_error) {
-        // Non-blocking request, ignore network issues here.
-      }
-    }
-    loadPopularCities();
-    return () => {
-      ignore = true;
-    };
+    fetch("/api/parse", { method: "POST" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        if (!payload || ignore) return;
+        setIsRefreshing(Boolean(payload.isRefreshing));
+        setRefreshStage(payload.refreshStage || "");
+      })
+      .catch(() => {});
+    return () => { ignore = true; };
   }, [isReady]);
 
   useEffect(() => {
-    if (!isReady) {
-      return;
-    }
-    const trimmed = cityInput.trim();
-    if (!trimmed) {
-      setCitySuggestions(popularCities);
-      return;
-    }
+    if (!isReady) return undefined;
+    const intervalId = window.setInterval(async () => {
+      if (document.hidden || liveSyncRef.current) return;
+      liveSyncRef.current = true;
+      pollTickRef.current += 1;
+      try {
+        await loadTours({ silent: true });
+        if (pollTickRef.current % 4 === 0) await loadQuickCities();
+        if (pollTickRef.current % 6 === 0) await loadStats();
+      } finally {
+        liveSyncRef.current = false;
+      }
+    }, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [isReady, filters, currentPage]);
 
+  useEffect(() => {
+    if (!isReady) return;
+    const prefix = deferredCityInput.trim();
+    if (!prefix) return void setCitySuggestions(quickCities);
     const controller = new AbortController();
-    const timer = setTimeout(async () => {
+    const timer = window.setTimeout(async () => {
       setIsCityLoading(true);
       try {
-        const response = await fetch(`/api/cities?q=${encodeURIComponent(trimmed)}&limit=12`, {
-          signal: controller.signal,
-        });
-        if (!response.ok) {
-          throw new Error("Не удалось получить города");
-        }
+        const response = await fetch(`/api/cities?${buildCityParams(prefix, 18).toString()}`, { signal: controller.signal });
+        if (!response.ok) throw new Error();
         const payload = await response.json();
-        setCitySuggestions(payload.cities || []);
-      } catch (citiesError) {
-        if (citiesError.name !== "AbortError") {
-          setCitySuggestions([]);
-        }
+        startTransition(() => setCitySuggestions(payload.cities || []));
+      } catch (err) {
+        if (err.name !== "AbortError") setCitySuggestions([]);
       } finally {
         setIsCityLoading(false);
       }
     }, 220);
-
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
-  }, [cityInput, isReady, popularCities]);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [deferredCityInput, isReady, quickCities, filters.query, filters.price, filters.categories]);
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [currentPage]);
-
-  function handlePointerMove(event) {
-    if (!shellRef.current) {
-      return;
-    }
-    const rect = shellRef.current.getBoundingClientRect();
-    const x = (event.clientX - rect.left) / rect.width - 0.5;
-    const y = (event.clientY - rect.top) / rect.height - 0.5;
-    shellRef.current.style.setProperty("--mx", `${(x * 20).toFixed(2)}px`);
-    shellRef.current.style.setProperty("--my", `${(y * 20).toFixed(2)}px`);
-  }
-
-  function resetPointer() {
-    if (!shellRef.current) {
-      return;
-    }
-    shellRef.current.style.setProperty("--mx", "0px");
-    shellRef.current.style.setProperty("--my", "0px");
-  }
-
-  async function loadTours() {
-    setIsLoading(true);
-    setError("");
-    const params = new URLSearchParams();
-    if (selectedPrice) {
-      params.set("pricePerPerson", selectedPrice);
-    }
-    if (selectedCity) {
-      params.set("city", selectedCity);
-    }
-    params.set("sort", sort);
-    params.set("limit", String(PAGE_SIZE));
-    params.set("offset", String((currentPage - 1) * PAGE_SIZE));
-    for (const categoryId of selectedCategories) {
-      params.append("category", categoryId);
-    }
-
-    try {
-      const response = await fetch(`/api/tours?${params.toString()}`);
-      if (!response.ok) {
-        throw new Error("Ошибка загрузки туров");
+    if (!isReady) return;
+    const prefix = deferredSearchInput.trim();
+    if (!prefix) return void setSearchSuggestions([]);
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setIsSearchLoading(true);
+      try {
+        const response = await fetch(`/api/search-suggestions?${buildSearchSuggestionParams(prefix, 14).toString()}`, { signal: controller.signal });
+        if (!response.ok) throw new Error();
+        const payload = await response.json();
+        startTransition(() => setSearchSuggestions(payload.queries || []));
+      } catch (err) {
+        if (err.name !== "AbortError") setSearchSuggestions([]);
+      } finally {
+        setIsSearchLoading(false);
       }
+    }, 220);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [deferredSearchInput, isReady, filters.city, filters.price, filters.categories]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = "night";
+    document.documentElement.dataset.locale = localeMode;
+    document.title = copy.title;
+  }, [localeMode, copy.title]);
+
+  function buildCommonParams() {
+    const params = new URLSearchParams();
+    if (filters.query) params.set("q", filters.query);
+    if (filters.city) params.set("city", filters.city);
+    if (filters.price) params.set("pricePerPerson", filters.price);
+    params.set("sort", filters.sort);
+    for (const categoryId of filters.categories) params.append("category", categoryId);
+    return params;
+  }
+
+  function buildCityParams(prefix, limit) {
+    const params = new URLSearchParams();
+    if (filters.query) params.set("tourQuery", filters.query);
+    if (filters.price) params.set("pricePerPerson", filters.price);
+    for (const categoryId of filters.categories) params.append("category", categoryId);
+    if (prefix) params.set("prefix", prefix);
+    params.set("limit", String(limit));
+    return params;
+  }
+
+  function buildSearchSuggestionParams(prefix, limit) {
+    const params = new URLSearchParams();
+    if (filters.city) params.set("city", filters.city);
+    if (filters.price) params.set("pricePerPerson", filters.price);
+    for (const categoryId of filters.categories) params.append("category", categoryId);
+    params.set("prefix", prefix);
+    params.set("limit", String(limit));
+    return params;
+  }
+
+  async function loadStats() {
+    try {
+      const response = await fetch("/api/stats");
+      if (!response.ok) return;
       const payload = await response.json();
-      setTours(payload.tours || []);
-      setCount(Number(payload.count || 0));
-      setLastParsedAt(payload.lastParsedAt || null);
+      startTransition(() => {
+        setStats(payload);
+        setLastParsedAt(payload.lastParsedAt || null);
+        setIsRefreshing(Boolean(payload.isRefreshing));
+        setRefreshStage(payload.refreshStage || "");
+      });
+    } catch (_error) {}
+  }
+
+  async function loadQuickCities() {
+    try {
+      const response = await fetch(`/api/cities?${buildCityParams("", 12).toString()}`);
+      if (!response.ok) return;
+      const payload = await response.json();
+      startTransition(() => {
+        setQuickCities(payload.cities || []);
+        if (!deferredCityInput.trim()) setCitySuggestions(payload.cities || []);
+      });
+    } catch (_error) {}
+  }
+
+  async function loadTours(options = {}) {
+    const silent = options.silent === true;
+    if (!silent) { setIsLoading(true); setError(""); }
+    try {
+      const params = buildCommonParams();
+      params.set("limit", String(PAGE_SIZE));
+      params.set("offset", String((currentPage - 1) * PAGE_SIZE));
+      const response = await fetch(`/api/tours?${params.toString()}`);
+      if (!response.ok) throw new Error("Ошибка загрузки каталога");
+      const payload = await response.json();
+      startTransition(() => {
+        setTours(payload.tours || []);
+        setCount(Number(payload.count || 0));
+        setLastParsedAt(payload.lastParsedAt || null);
+        setIsRefreshing(Boolean(payload.isRefreshing));
+        setRefreshStage(payload.refreshStage || "");
+      });
     } catch (loadError) {
-      setError(loadError.message || "Не удалось загрузить туры");
+      if (!silent) setError(loadError.message || "Не удалось загрузить путёвки");
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }
 
-  async function onRefreshParse() {
-    setIsLoading(true);
-    setError("");
+  async function refreshCatalog() {
+    setIsStartingRefresh(true);
     try {
       const response = await fetch("/api/parse", { method: "POST" });
-      if (!response.ok) {
-        throw new Error("Не удалось обновить парсер");
-      }
-      await loadTours();
+      if (!response.ok) throw new Error("Не удалось обновить поиск");
+      const payload = await response.json();
+      setIsRefreshing(Boolean(payload.isRefreshing));
+      setRefreshStage(payload.refreshStage || "");
+      await Promise.all([loadStats(), loadQuickCities(), loadTours()]);
     } catch (refreshError) {
       setError(refreshError.message || "Не удалось обновить данные");
     } finally {
-      setIsLoading(false);
+      setIsStartingRefresh(false);
     }
   }
 
-  function onCategoryToggle(categoryId, enabled) {
-    setCurrentPage(1);
-    if (enabled) {
-      setSelectedCategories((prev) => (prev.includes(categoryId) ? prev : [...prev, categoryId]));
-    } else {
-      setSelectedCategories((prev) => prev.filter((item) => item !== categoryId));
-    }
-  }
-
-  function removeCategory(categoryId) {
-    setSelectedCategories((prev) => prev.filter((item) => item !== categoryId));
+  function submitSearch(event) {
+    event.preventDefault();
+    const exactCity = citySuggestions.find((item) => normalizeText(item.city) === normalizeText(cityInput));
+    const nextCity = cityInput.trim() ? (exactCity || citySuggestions[0] || { city: cityInput.trim() }).city : "";
+    setFilters((prev) => ({ ...prev, query: searchInput.trim(), city: nextCity }));
+    setCityInput(nextCity);
     setCurrentPage(1);
   }
 
-  function applyCity(cityName) {
-    const normalized = String(cityName || "").trim();
-    setSelectedCity(normalized);
-    setCityInput(normalized);
-    setCurrentPage(1);
-  }
+  const clearQuery = () => { setFilters((prev) => ({ ...prev, query: "" })); setSearchInput(""); setCurrentPage(1); };
+  const clearPrice = () => { setFilters((prev) => ({ ...prev, price: "" })); setCurrentPage(1); };
+  const applyCity = (city) => { const normalized = String(city || "").trim(); setFilters((prev) => ({ ...prev, city: normalized })); setCityInput(normalized); setCurrentPage(1); };
+  const applyRegion = (region) => { const normalized = String(region || "").trim(); setFilters((prev) => ({ ...prev, query: normalized, city: "" })); setSearchInput(normalized); setCityInput(""); setCurrentPage(1); };
+  const applySearchSuggestion = (query) => { const normalized = String(query || "").trim(); setFilters((prev) => ({ ...prev, query: normalized })); setSearchInput(normalized); setCurrentPage(1); };
+  const resetFilters = () => { setFilters({ query: "", city: "", price: "", sort: "price_asc", categories: [] }); setSearchInput(""); setCityInput(""); setCurrentPage(1); };
+  const toggleCategory = (categoryId) => { setFilters((prev) => ({ ...prev, categories: prev.categories.includes(categoryId) ? prev.categories.filter((item) => item !== categoryId) : [...prev.categories, categoryId] })); setCurrentPage(1); };
+  const openTourLink = (url) => { const normalized = String(url || "").trim(); if (normalized && normalized !== "#") window.open(normalized, "_blank", "noopener,noreferrer"); };
 
-  function clearCity() {
-    setSelectedCity("");
-    setCityInput("");
-    setCurrentPage(1);
-  }
+  return html`
+    <div className="shell" ref=${shellRef} onMouseMove=${(event) => {
+      const rect = shellRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const x = (event.clientX - rect.left) / rect.width - 0.5;
+      const y = (event.clientY - rect.top) / rect.height - 0.5;
+      shellRef.current.style.setProperty("--mx", `${(x * 20).toFixed(2)}px`);
+      shellRef.current.style.setProperty("--my", `${(y * 20).toFixed(2)}px`);
+    }} onMouseLeave=${() => {
+      if (!shellRef.current) return;
+      shellRef.current.style.setProperty("--mx", "0px");
+      shellRef.current.style.setProperty("--my", "0px");
+    }}>
+      <div className="shell__nebula shell__nebula--a" aria-hidden="true"></div>
+      <div className="shell__nebula shell__nebula--b" aria-hidden="true"></div>
+      <div className="shell__glow shell__glow--a" aria-hidden="true"></div>
+      <div className="shell__glow shell__glow--b" aria-hidden="true"></div>
+      <div className="shell__stage" aria-hidden="true">
+        <div className="stage-orb stage-orb--hero"></div>
+        <div className="stage-orb stage-orb--echo"></div>
+        <div className="stage-glass stage-glass--a"></div>
+        <div className="stage-glass stage-glass--b"></div>
+        <div className="stage-shard stage-shard--a"></div>
+      </div>
+      <div className="shell__inner">
+        <header className="hero-panel">
+          <section className="card hero-panel__main">
+            <div className="eyebrow-row">
+              <span className="eyebrow">${copy.eyebrow}</span>
+              <span className=${isRefreshing ? "status-dot status-dot--live" : "status-dot"}>
+                ${isRefreshing ? liveStageLabel : copy.calm}
+              </span>
+            </div>
+            <div className="hero-utilities">
+              <div className="switcher">
+                <button className=${localeMode === "ru" ? "switcher__button switcher__button--active" : "switcher__button"} type="button" onClick=${() => setLocaleMode("ru")}>RU</button>
+                <button className=${localeMode === "eu" ? "switcher__button switcher__button--active" : "switcher__button"} type="button" onClick=${() => setLocaleMode("eu")}>EU</button>
+              </div>
+            </div>
+            <h1>${copy.title}</h1>
+            <p className="hero-copy">${copy.heroCopy}</p>
+            <div className="hero-stats">
+              <article className="hero-stat hero-stat--warm"><span>${copy.variants}</span><strong>${numberFormatter.format(count || 0)}</strong></article>
+              <article className="hero-stat hero-stat--cool"><span>${copy.averagePrice}</span><strong>${stats?.priceAvg ? formatPrice(stats.priceAvg) : "..."}</strong></article>
+              <article className="hero-stat hero-stat--rose"><span>${copy.trip}</span><strong>${copy.tripMeta(planner.nights, planner.people)}</strong></article>
+            </div>
+          </section>
+          <section className="card card--dark hero-panel__aside">
+            <div className="signal-head">
+              <div><span>${copy.flow}</span><strong>${numberFormatter.format(count || 0)}</strong></div>
+              <button className="action-button action-button--ghost" type="button" onClick=${refreshCatalog} disabled=${isStartingRefresh || isRefreshing}>
+                ${isStartingRefresh || isRefreshing ? copy.updating : copy.launchSearch}
+              </button>
+            </div>
+            <div className="signal-track" aria-hidden="true"><div className="signal-track__bar" style=${{ width: progressPercent }}></div></div>
+            <div className="signal-grid">
+              <div className="signal-cell"><span>${copy.source}</span><strong>${sourceLabel}</strong></div>
+              <div className="signal-cell"><span>${copy.updated}</span><strong>${formatDate(lastParsedAt || stats?.lastParsedAt)}</strong></div>
+              <div className="signal-cell"><span>${copy.minimum}</span><strong>${stats?.priceMin ? formatPrice(stats.priceMin) : "..."}</strong></div>
+              <div className="signal-cell"><span>${copy.maximum}</span><strong>${stats?.priceMax ? formatPrice(stats.priceMax) : "..."}</strong></div>
+            </div>
+            <p className="signal-note">
+              ${isRefreshing
+                ? copy.liveNote(numberFormatter.format(count || 0))
+                : copy.stableNote}
+            </p>
+          </section>
+        </header>
 
-  function openTourLink(url) {
-    const normalized = String(url || "").trim();
-    if (!normalized || normalized === "#") {
-      return;
-    }
-    window.open(normalized, "_blank", "noopener,noreferrer");
-  }
+        <section className="card search-deck">
+          <form className="search-deck__form" onSubmit=${submitSearch}>
+            <label className="search-field search-field--query"><span>${copy.searchLabel}</span><input className="search-control" value=${searchInput} onInput=${(event) => setSearchInput(event.target.value)} placeholder=${copy.searchPlaceholder} /></label>
+            <label className="search-field"><span>${copy.cityLabel}</span><input className="search-control" value=${cityInput} onInput=${(event) => setCityInput(event.target.value)} placeholder=${copy.cityPlaceholder} /></label>
+            <label className="search-field"><span>${copy.priceLabel}</span><select className="search-control" value=${filters.price} onChange=${(event) => { setFilters((prev) => ({ ...prev, price: event.target.value })); setCurrentPage(1); }}><option value="">${copy.anyPrice}</option>${priceOptions.map((price) => html`<option key=${String(price)} value=${String(price)}>${formatPrice(price)}</option>`)}</select></label>
+            <label className="search-field search-field--small"><span>${copy.nightsLabel}</span><select className="search-control" value=${String(planner.nights)} onChange=${(event) => setPlanner((prev) => ({ ...prev, nights: Number(event.target.value) }))}>${NIGHT_OPTIONS.map((nights) => html`<option key=${String(nights)} value=${String(nights)}>${nights}</option>`)}</select></label>
+            <label className="search-field search-field--small"><span>${copy.peopleLabel}</span><select className="search-control" value=${String(planner.people)} onChange=${(event) => setPlanner((prev) => ({ ...prev, people: Number(event.target.value) }))}>${PEOPLE_OPTIONS.map((people) => html`<option key=${String(people)} value=${String(people)}>${people}</option>`)}</select></label>
+            <label className="search-field"><span>${copy.sortLabel}</span><select className="search-control" value=${filters.sort} onChange=${(event) => { setFilters((prev) => ({ ...prev, sort: event.target.value })); setCurrentPage(1); }}>${sortOptions.map((option) => html`<option key=${option.value} value=${option.value}>${option.label}</option>`)}</select></label>
+            <div className="search-actions">
+              <button className="action-button action-button--primary" type="submit">${copy.searchAction}</button>
+              <button className="action-button action-button--soft" type="button" onClick=${resetFilters}>${copy.resetAction}</button>
+            </div>
+          </form>
+          <div className="deck-bands">
+            ${visibleQueries.length || isSearchLoading ? html`<div className="deck-band"><span className="deck-band__label">${isSearchLoading ? copy.hintsLoading : copy.hints}</span><div className="token-row">${visibleQueries.map((item) => html`<button key=${item.query} type="button" className="token token--query" onClick=${() => applySearchSuggestion(item.query)}><strong>${item.query}</strong><span>${item.count}</span></button>`)}</div></div>` : null}
+              <div className="deck-band"><span className="deck-band__label">${isCityLoading ? copy.citiesLoading : copy.cities}</span><div className="token-row">${visibleCities.map((item) => html`<button key=${item.city} type="button" className=${normalizeText(filters.city) === normalizeText(item.city) ? "token token--city token--active" : "token token--city"} onClick=${() => applyCity(item.city)}><strong>${displayText(item.city)}</strong><span>${item.count}</span></button>`)}</div></div>
+            ${activeFilters.length ? html`<div className="deck-band"><span className="deck-band__label">${copy.chosen}</span><div className="token-row">${activeFilters.map((item) => html`<button key=${item.key} className="token token--filter" type="button" onClick=${item.onClick}>${item.label} ×</button>`)}</div></div>` : null}
+          </div>
+        </section>
 
-  function resetFilters() {
-    setSelectedCategories([]);
-    setSelectedPrice("");
-    setSelectedCity("");
-    setCityInput("");
-    setSort("price_asc");
-    setCurrentPage(1);
-  }
+        <main className="board">
+          <aside className="board__sidebar">
+            <section className="card stack-card stack-card--sticky">
+              <div className="stack-card__head"><h2>${copy.navigator}</h2><span>${filters.categories.length ? copy.activeCategories(filters.categories.length) : copy.allCategories}</span></div>
+              <div className="category-list">${categories.map((category, index) => {
+                const categoryContent = getCategoryContent(category.id, localeMode, category);
+                return html`<button key=${category.id} type="button" className=${filters.categories.includes(category.id) ? "category-row category-row--active" : "category-row"} onClick=${() => toggleCategory(category.id)} style=${{ "--tile-delay": `${index * 30}ms` }}><strong>${categoryContent.label}</strong><span>${categoryContent.description}</span></button>`;
+              })}</div>
+            </section>
+            <section className="card stack-card">
+              <div className="stack-card__head"><h2>${copy.plan}</h2><span>${copy.concise}</span></div>
+              <div className="mini-grid">
+                <div className="mini-grid__item"><span>${copy.duration}</span><strong>${planner.nights} ${localeMode === "ru" ? "ночей" : "nights"}</strong></div>
+                <div className="mini-grid__item"><span>${copy.party}</span><strong>${planner.people} ${localeMode === "ru" ? "чел." : "guests"}</strong></div>
+                <div className="mini-grid__item"><span>${copy.start}</span><strong>${plannerMinBudget ? formatMoney(plannerMinBudget) : "..."}</strong></div>
+                <div className="mini-grid__item"><span>${copy.averageBill}</span><strong>${plannerAverageBudget ? formatMoney(plannerAverageBudget) : "..."}</strong></div>
+              </div>
+            </section>
+          </aside>
 
-  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
-  const pageTokens = useMemo(
-    () => buildPageTokens(currentPage, totalPages),
-    [currentPage, totalPages]
-  );
-
-  const categoryMap = useMemo(() => {
-    const map = new Map();
-    for (const category of categories) {
-      map.set(category.id, category.label);
-    }
-    return map;
-  }, [categories]);
-
-  return h(
-    "div",
-    {
-      className: "page-shell",
-      ref: shellRef,
-      onMouseMove: handlePointerMove,
-      onMouseLeave: resetPointer,
-    },
-    h("div", { className: "scene", "aria-hidden": "true" },
-      h("div", { className: "scene__grid" }),
-      h("div", { className: "scene__blob scene__blob--a" }),
-      h("div", { className: "scene__blob scene__blob--b" }),
-      h("div", { className: "scene__blob scene__blob--c" }),
-      h("div", { className: "scene__ring scene__ring--a" }),
-      h("div", { className: "scene__ring scene__ring--b" })
-    ),
-    h(
-      "header",
-      { className: "hero" },
-      h(
-        "div",
-        { className: "hero__content" },
-        h("p", { className: "hero__eyebrow" }, "Каталог путевок"),
-        h("h1", null, "Путевки по России"),
-        h(
-          "p",
-          { className: "hero__subtitle" },
-          "Живая витрина путевок: листай страницы, выбирай категории и находи лучший отдых."
-        )
-      )
-    ),
-    h(
-      "main",
-      { className: "layout" },
-      h(
-        "aside",
-        { className: "panel filters" },
-        h("h2", null, "Фильтры"),
-        h("label", { className: "label", htmlFor: "sortSelect" }, "Сортировка"),
-        h(
-          "select",
-          {
-            id: "sortSelect",
-            className: "select",
-            value: sort,
-            onChange: (event) => {
-              setSort(event.target.value);
-              setCurrentPage(1);
-            },
-          },
-          ...SORT_OPTIONS.map((option) => h("option", { key: option.value, value: option.value }, option.label))
-        ),
-        h("label", { className: "label", htmlFor: "priceSelect" }, "Цена на человека"),
-        h(
-          "select",
-          {
-            id: "priceSelect",
-            className: "select",
-            value: selectedPrice,
-            onChange: (event) => {
-              setSelectedPrice(event.target.value);
-              setCurrentPage(1);
-            },
-          },
-          h("option", { value: "" }, "Любая"),
-          ...priceOptions.map((price) =>
-            h("option", { key: price, value: String(price) }, formatPrice(price))
-          )
-        ),
-        h("label", { className: "label", htmlFor: "cityInput" }, "Город"),
-        h(
-          "div",
-          { className: "city-search" },
-          h(
-            "div",
-            { className: "city-search__row" },
-            h("input", {
-              id: "cityInput",
-              className: "input",
-              type: "text",
-              value: cityInput,
-              placeholder: "Начни вводить город",
-              onChange: (event) => {
-                const nextValue = event.target.value;
-                setCityInput(nextValue);
-                if (!nextValue.trim()) {
-                  setSelectedCity("");
-                  setCurrentPage(1);
-                }
-              },
-              onKeyDown: (event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  applyCity(cityInput);
-                }
-              },
-            }),
-            selectedCity
-              ? h(
-                  "button",
-                  {
-                    className: "city-search__clear",
-                    type: "button",
-                    onClick: clearCity,
-                    title: "Очистить город",
-                  },
-                  "×"
-                )
-              : null
-          ),
-          cityInput.trim() && isCityLoading
-            ? h("p", { className: "city-search__status" }, "Ищем города...")
-            : null,
-          citySuggestions.length > 0
-            ? h(
-                "div",
-                { className: "city-suggestions" },
-                ...citySuggestions.map((item) =>
-                  h(
-                    "button",
-                    {
-                      key: `city_suggestion_${item.city}`,
-                      className:
-                        selectedCity === item.city
-                          ? "city-suggestion city-suggestion--active"
-                          : "city-suggestion",
-                      type: "button",
-                      onClick: () => applyCity(item.city),
-                    },
-                    `${item.city} (${item.count})`
-                  )
-                )
-              )
-            : cityInput.trim()
-              ? h("p", { className: "city-search__status" }, "Городов по этому префиксу нет")
-              : null,
-          h(
-            "button",
-            {
-              className: "btn btn--city",
-              type: "button",
-              onClick: () => applyCity(cityInput),
-              disabled: !cityInput.trim(),
-            },
-            selectedCity ? `Применен: ${selectedCity}` : "Применить город"
-          )
-        ),
-        popularCities.length > 0
-          ? h(
-              "div",
-              { className: "popular-cities" },
-              h("p", { className: "label label--compact" }, "Популярные города"),
-              h(
-                "div",
-                { className: "popular-cities__list" },
-                ...popularCities.slice(0, 8).map((item) =>
-                  h(
-                    "button",
-                    {
-                      key: `city_popular_${item.city}`,
-                      className: "popular-cities__chip",
-                      type: "button",
-                      onClick: () => applyCity(item.city),
-                    },
-                    item.city
-                  )
-                )
-              )
-            )
-          : null,
-        h("p", { className: "label" }, "Категории"),
-        h(
-          "div",
-          { className: "category-list" },
-          ...categories.map((category) =>
-            h(
-              "label",
-              { className: "category-item", key: category.id },
-              h("input", {
-                type: "checkbox",
-                checked: selectedCategories.includes(category.id),
-                onChange: (event) => onCategoryToggle(category.id, event.target.checked),
-              }),
-              h("span", { className: "category-item__title" }, category.label),
-              h("span", { className: "category-item__desc" }, category.description)
-            )
-          )
-        ),
-        h(
-          "div",
-          { className: "button-row" },
-          h(
-            "button",
-            { className: "btn", type: "button", onClick: onRefreshParse, disabled: isLoading },
-            isLoading ? "Обновление..." : "Обновить парсер"
-          ),
-          h(
-            "button",
-            { className: "btn btn--secondary", type: "button", onClick: resetFilters, disabled: isLoading },
-            "Сбросить фильтры"
-          )
-        )
-      ),
-      h(
-        "section",
-        { className: "panel results" },
-        error ? h("div", { className: "error-box" }, error) : null,
-        h(
-          "div",
-          { className: "results__head" },
-          h(
-            "div",
-            { className: "results__meta" },
-            h("strong", null, `Найдено: ${count}`),
-            h("span", null, `Страница: ${currentPage} из ${totalPages}`),
-            h("span", null, selectedCity ? `Город: ${selectedCity}` : "Город: все"),
-            h("span", null, `Обновлено: ${formatDate(lastParsedAt)}`)
-          ),
-          h(
-            "div",
-            { className: "view-switch" },
-            h(
-              "button",
-              {
-                className: viewMode === "grid" ? "view-switch__btn view-switch__btn--active" : "view-switch__btn",
-                type: "button",
-                onClick: () => setViewMode("grid"),
-              },
-              "Сетка"
-            ),
-            h(
-              "button",
-              {
-                className: viewMode === "list" ? "view-switch__btn view-switch__btn--active" : "view-switch__btn",
-                type: "button",
-                onClick: () => setViewMode("list"),
-              },
-              "Список"
-            )
-          )
-        ),
-        selectedCategories.length > 0 || Boolean(selectedCity)
-          ? h(
-              "div",
-              { className: "active-filters" },
-              selectedCity
-                ? h(
-                    "button",
-                    {
-                      key: "active_city",
-                      className: "active-filter",
-                      type: "button",
-                      onClick: clearCity,
-                    },
-                    `Город: ${selectedCity} ×`
-                  )
-                : null,
-              ...selectedCategories.map((categoryId) =>
-                h(
-                  "button",
-                  {
-                    key: `active_${categoryId}`,
-                    className: "active-filter",
-                    type: "button",
-                    onClick: () => removeCategory(categoryId),
-                  },
-                  `${categoryMap.get(categoryId) || categoryId} ×`
-                )
-              )
-            )
-          : null,
-        isLoading
-          ? h(
-              "div",
-              { className: viewMode === "list" ? "cards cards--list" : "cards cards--grid" },
-              ...Array.from({ length: 8 }).map((_, index) =>
-                h("div", { key: `skeleton_${index}`, className: "tour-card skeleton" })
-              )
-            )
-          : null,
-        !isLoading && tours.length === 0
-          ? h("div", { className: "empty" }, "По выбранным фильтрам путевки не найдены.")
-          : null,
-        !isLoading
-          ? h(
-              "div",
-              { className: viewMode === "list" ? "cards cards--list" : "cards cards--grid" },
-              ...tours.map((tour) =>
-                h(
-                  "article",
-                  {
-                    className: "tour-card",
-                    key: tour.id,
-                    role: "link",
-                    tabIndex: 0,
-                    onClick: () => openTourLink(tour.link),
-                    onKeyDown: (event) => {
+          <section className="board__main">
+            <section className="card destination-stage">
+              <div className="destination-stage__head"><h2>${copy.destinations}</h2><span>${copy.destinationHint}</span></div>
+              <div className="destination-stage__rail">${quickCities.map((item, index) => html`<button key=${item.city} type="button" className=${normalizeText(filters.city) === normalizeText(item.city) ? "destination-card destination-card--active" : "destination-card"} onClick=${() => applyCity(item.city)} style=${{ "--city-delay": `${index * 40}ms` }}><span>${displayText(item.city)}</span><strong>${item.count}</strong></button>`)}</div>
+            </section>
+            <section className="card results-banner">
+              <div><h2>${numberFormatter.format(count || 0)} ${copy.results}</h2><div className="results-banner__meta"><span>${filters.city ? copy.cityOne(displayText(filters.city)) : copy.cityAll}</span><span>${copy.page(currentPage, totalPages)}</span><span>${copy.tripMeta(planner.nights, planner.people)}</span><span>${formatDate(lastParsedAt)}</span></div></div>
+              <div className="view-toggle"><button className=${viewMode === "grid" ? "toggle-button toggle-button--active" : "toggle-button"} type="button" onClick=${() => setViewMode("grid")}>${copy.tile}</button><button className=${viewMode === "list" ? "toggle-button toggle-button--active" : "toggle-button"} type="button" onClick=${() => setViewMode("list")}>${copy.list}</button></div>
+            </section>
+            ${error ? html`<div className="card notice notice--error">${error}</div>` : null}
+            ${isLoading
+              ? html`<div className=${viewMode === "list" ? "catalog catalog--list" : "catalog catalog--grid"}>${Array.from({ length: 8 }).map((_, index) => html`<div key=${`skeleton_${index}`} className="card offer-card skeleton" style=${{ "--card-delay": `${index * 50}ms` }}></div>`)}</div>`
+              : tours.length
+                ? html`<div className=${viewMode === "list" ? "catalog catalog--list" : "catalog catalog--grid"}>${tours.map((tour, index) => html`
+                    <article key=${tour.id} className="card offer-card" role="link" tabIndex="0" style=${{ "--card-delay": `${index * 40}ms` }} onClick=${() => openTourLink(tour.link)} onKeyDown=${(event) => {
                       if (event.key === "Enter" || event.key === " ") {
                         event.preventDefault();
                         openTourLink(tour.link);
                       }
-                    },
-                  },
-                  h(
-                    "p",
-                    { className: "tour-card__region" },
-                    `${tour.city && tour.city !== tour.region ? `${tour.city}, ${tour.region}` : tour.city || tour.region} • ${tour.days} ночей`
-                  ),
-                  h("h3", { className: "tour-card__title" }, tour.title),
-                  h("p", { className: "tour-card__price" }, formatPrice(tour.pricePerPerson)),
-                  h(
-                    "div",
-                    { className: "chip-list" },
-                    ...tour.categories.slice(0, 4).map((categoryId) =>
-                      h(
-                        "span",
-                        { className: "chip", key: `${tour.id}_${categoryId}` },
-                        categoryMap.get(categoryId) || categoryId
-                      )
-                    )
-                  ),
-                  h("p", { className: "tour-card__desc" }, tourDescription(tour)),
-                  h(
-                    "a",
-                    {
-                      className: "tour-card__link",
-                      href: tour.link,
-                      target: "_blank",
-                      rel: "noreferrer",
-                      onClick: (event) => event.stopPropagation(),
-                    },
-                    "Подробнее"
-                  )
-                )
-              )
-            )
-          : null,
-        h(
-          "div",
-          { className: "pager pager--numbers" },
-          h(
-            "button",
-            {
-              className: "pager__btn",
-              type: "button",
-              disabled: currentPage === 1 || isLoading,
-              onClick: () => setCurrentPage((page) => Math.max(1, page - 1)),
-            },
-            "Назад"
-          ),
-          ...pageTokens.map((token, index) =>
-            token === "..."
-              ? h("span", { className: "pager__dots", key: `dots_${index}` }, "…")
-              : h(
-                  "button",
-                  {
-                    key: `page_${token}`,
-                    className:
-                      token === currentPage ? "pager__btn pager__btn--active" : "pager__btn",
-                    type: "button",
-                    onClick: () => setCurrentPage(token),
-                    disabled: isLoading,
-                  },
-                  String(token)
-                )
-          ),
-          h(
-            "button",
-            {
-              className: "pager__btn",
-              type: "button",
-              disabled: currentPage >= totalPages || isLoading,
-              onClick: () => setCurrentPage((page) => Math.min(totalPages, page + 1)),
-            },
-            "Вперед"
-          )
-        )
-      )
-    )
-  );
+                    }}>
+                      <div className="offer-card__top">
+                        <p className="offer-card__place">${displayText(tour.city && tour.city !== tour.region ? `${tour.city}, ${tour.region}` : tour.city || tour.region)}</p>
+                        <span className="offer-card__stay">${formatMinNights(tour.minNights || tour.days, localeMode)}</span>
+                      </div>
+                      <h3>${tour.title}</h3>
+                      <div className="offer-card__chips">${(tour.categories || []).slice(0, 4).map((categoryId) => html`<span key=${`${tour.id}_${categoryId}`} className="soft-mark">${categoryMap.get(categoryId) || categoryId}</span>`)}</div>
+                      <div className="offer-card__bottom"><div className="offer-card__price"><strong>${formatPrice(tour.pricePerPerson)}</strong><span>${copy.exactPrice}</span></div><a href=${tour.link} target="_blank" rel="noreferrer" onClick=${(event) => event.stopPropagation()}>${copy.open}</a></div>
+                    </article>`)}
+                  </div>`
+                : html`<div className="card notice">${copy.noOptions}</div>`}
+            <div className="pager"><button className="pager-button" type="button" disabled=${currentPage === 1 || isLoading} onClick=${() => setCurrentPage((page) => Math.max(1, page - 1))}>${copy.back}</button>${pageTokens.map((token, index) => token === "..." ? html`<span key=${`dots_${index}`} className="pager__dots">…</span>` : html`<button key=${String(token)} className=${token === currentPage ? "pager-button pager-button--active" : "pager-button"} type="button" onClick=${() => setCurrentPage(token)} disabled=${isLoading}>${String(token)}</button>`)}<button className="pager-button" type="button" disabled=${currentPage >= totalPages || isLoading} onClick=${() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>${copy.forward}</button></div>
+          </section>
+
+          <aside className="board__aside">
+            <section className="card stack-card stack-card--accent">
+              <div className="stack-card__head"><h2>${copy.pulse}</h2><span>${isRefreshing ? copy.searching : copy.done}</span></div>
+              <div className="mini-grid mini-grid--single">
+                <div className="mini-grid__item"><span>${copy.inCatalog}</span><strong>${numberFormatter.format(count || 0)}</strong></div>
+                <div className="mini-grid__item"><span>${copy.averagePrice}</span><strong>${stats?.priceAvg ? formatPrice(stats.priceAvg) : "..."}</strong></div>
+                <div className="mini-grid__item"><span>${copy.minimum}</span><strong>${stats?.priceMin ? formatPrice(stats.priceMin) : "..."}</strong></div>
+              </div>
+            </section>
+            <section className="card stack-card"><div className="stack-card__head"><h2>${copy.regions}</h2><span>${copy.regionsHint}</span></div><div className="stack-list">${(stats?.topRegions || []).map((item) => html`<button key=${item.region} type="button" className="stack-link" onClick=${() => applyRegion(item.region)}><span>${displayText(item.region)}</span><strong>${item.count}</strong></button>`)}</div></section>
+            <section className="card stack-card"><div className="stack-card__head"><h2>${copy.typeSlice}</h2><span>${copy.typeHint}</span></div><div className="stack-list">${topCategoryRows.map((item) => html`<button key=${item.id} type="button" className="stack-link" onClick=${() => toggleCategory(item.id)}><span>${item.label}</span><strong>${item.total}</strong></button>`)}</div></section>
+          </aside>
+        </main>
+      </div>
+    </div>
+  `;
 }
 
-createRoot(document.getElementById("root")).render(h(App));
+createRoot(document.getElementById("root")).render(html`<${App} />`);
