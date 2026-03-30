@@ -138,6 +138,31 @@ const COPY = {
     forward: "вперёд",
     open: "открыть",
     exactPrice: "точная цена с сайта",
+    reviewButton: "отзывы",
+    reviewsTitle: "Отзывы",
+    reviewsLoading: "загружаем отзывы",
+    reviewsEmpty: "Пока нет отзывов по этому объекту.",
+    reviewsOpen: "перейти на объект",
+    authOpen: "войти",
+    authTitle: "Аккаунт",
+    authSubtitle: "Регистрация и вход по логину и паролю.",
+    authLoginTab: "вход",
+    authRegisterTab: "регистрация",
+    usernameLabel: "логин",
+    usernamePlaceholder: "придумайте логин",
+    passwordLabel: "пароль",
+    passwordPlaceholder: "введите пароль",
+    confirmPasswordLabel: "повтор пароля",
+    confirmPasswordPlaceholder: "повторите пароль",
+    authLoginAction: "войти",
+    authRegisterAction: "зарегистрироваться",
+    authLogout: "выйти",
+    authLoggedIn: (username) => `вы вошли как ${username}`,
+    authPasswordMismatch: "Пароли не совпадают.",
+    authRequired: "Заполните логин и пароль.",
+    close: "закрыть",
+    guestLabel: "гость",
+    reviewCount: (count) => `${count} отзывов`,
     sort: {
       price_asc: "Дешевле",
       price_desc: "Дороже",
@@ -220,6 +245,31 @@ const COPY = {
     forward: "next",
     open: "open",
     exactPrice: "exact price from site",
+    reviewButton: "reviews",
+    reviewsTitle: "Reviews",
+    reviewsLoading: "loading reviews",
+    reviewsEmpty: "No reviews found for this property yet.",
+    reviewsOpen: "open property",
+    authOpen: "sign in",
+    authTitle: "Account",
+    authSubtitle: "Registration and login with username and password.",
+    authLoginTab: "login",
+    authRegisterTab: "register",
+    usernameLabel: "username",
+    usernamePlaceholder: "choose username",
+    passwordLabel: "password",
+    passwordPlaceholder: "enter password",
+    confirmPasswordLabel: "confirm password",
+    confirmPasswordPlaceholder: "repeat password",
+    authLoginAction: "sign in",
+    authRegisterAction: "create account",
+    authLogout: "log out",
+    authLoggedIn: (username) => `signed in as ${username}`,
+    authPasswordMismatch: "Passwords do not match.",
+    authRequired: "Fill username and password.",
+    close: "close",
+    guestLabel: "guest",
+    reviewCount: (count) => `${count} reviews`,
     sort: {
       price_asc: "Cheaper first",
       price_desc: "Pricier first",
@@ -311,6 +361,14 @@ function formatMinNights(value, localeMode) {
     : `from ${nights} ${formatNightWord(nights, localeMode)}`;
 }
 
+function formatReviewDate(value, localeCode) {
+  const safe = String(value || "").trim();
+  if (!safe) return "";
+  const parsed = new Date(safe);
+  if (Number.isNaN(parsed.getTime())) return safe;
+  return parsed.toLocaleDateString(localeCode);
+}
+
 function placeLabelFromTour(tour) {
   const city = String(tour?.city || "").trim();
   const region = String(tour?.region || "").trim();
@@ -374,6 +432,7 @@ function App() {
   const shellRef = useRef(null);
   const liveSyncRef = useRef(false);
   const pollTickRef = useRef(0);
+  const toursRequestRef = useRef(0);
   const [categories, setCategories] = useState([]);
   const [priceOptions, setPriceOptions] = useState([]);
   const [stats, setStats] = useState(null);
@@ -398,6 +457,24 @@ function App() {
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [refreshStage, setRefreshStage] = useState("");
   const [error, setError] = useState("");
+  const [reviewModalTour, setReviewModalTour] = useState(null);
+  const [reviewItems, setReviewItems] = useState([]);
+  const [isReviewsLoading, setIsReviewsLoading] = useState(false);
+  const [reviewsError, setReviewsError] = useState("");
+  const [detailModalTour, setDetailModalTour] = useState(null);
+  const [detailData, setDetailData] = useState(null);
+  const [detailError, setDetailError] = useState("");
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [bookingForm, setBookingForm] = useState({ customerName: "", phone: "", email: "", comment: "" });
+  const [bookingError, setBookingError] = useState("");
+  const [bookingSuccess, setBookingSuccess] = useState("");
+  const [isBookingPending, setIsBookingPending] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState("login");
+  const [authForm, setAuthForm] = useState({ username: "", password: "", confirmPassword: "" });
+  const [authError, setAuthError] = useState("");
+  const [isAuthPending, setIsAuthPending] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
 
   const deferredCityInput = useDeferredValue(cityInput);
   const deferredSearchInput = useDeferredValue(searchInput);
@@ -456,11 +533,17 @@ function App() {
   useEffect(() => {
     async function bootstrap() {
       try {
-        const [categoriesRes, pricesRes, statsRes] = await Promise.all([fetch("/api/categories"), fetch("/api/price-options"), fetch("/api/stats")]);
-        if (!categoriesRes.ok || !pricesRes.ok || !statsRes.ok) throw new Error("Не удалось загрузить стартовые данные");
+        const [categoriesRes, pricesRes, statsRes, sessionRes] = await Promise.all([
+          fetch("/api/categories"),
+          fetch("/api/price-options"),
+          fetch("/api/stats"),
+          fetch("/api/auth/session"),
+        ]);
+        if (!categoriesRes.ok || !pricesRes.ok || !statsRes.ok || !sessionRes.ok) throw new Error("Не удалось загрузить стартовые данные");
         const categoriesPayload = await categoriesRes.json();
         const pricesPayload = await pricesRes.json();
         const statsPayload = await statsRes.json();
+        const sessionPayload = await sessionRes.json();
         setCategories(categoriesPayload.categories || []);
         setPriceOptions(pricesPayload.options || []);
         setStats(statsPayload);
@@ -468,6 +551,7 @@ function App() {
         setLastParsedAt(statsPayload.lastParsedAt || null);
         setIsRefreshing(Boolean(statsPayload.isRefreshing));
         setRefreshStage(statsPayload.refreshStage || "");
+        setCurrentUser(sessionPayload.isAuthenticated ? { username: sessionPayload.username } : null);
         setIsReady(true);
       } catch (bootstrapError) {
         setError(bootstrapError.message || "Ошибка запуска");
@@ -562,6 +646,33 @@ function App() {
     document.title = copy.title;
   }, [localeMode, copy.title]);
 
+  useEffect(() => {
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setReviewModalTour(null);
+        setReviewItems([]);
+        setReviewsError("");
+        setDetailModalTour(null);
+        setDetailData(null);
+        setDetailError("");
+        setBookingError("");
+        setBookingSuccess("");
+        setIsAuthModalOpen(false);
+        setAuthError("");
+      }
+    }
+    if (reviewModalTour || detailModalTour || isAuthModalOpen) {
+      document.body.style.overflow = "hidden";
+      window.addEventListener("keydown", handleKeyDown);
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [reviewModalTour, detailModalTour, isAuthModalOpen]);
+
   function buildCommonParams() {
     const params = new URLSearchParams();
     if (filters.query) params.set("q", filters.query);
@@ -620,6 +731,7 @@ function App() {
 
   async function loadTours(options = {}) {
     const silent = options.silent === true;
+    const requestId = ++toursRequestRef.current;
     if (!silent) { setIsLoading(true); setError(""); }
     try {
       const params = buildCommonParams();
@@ -636,9 +748,17 @@ function App() {
         setRefreshStage(payload.refreshStage || "");
       });
     } catch (loadError) {
+      if (requestId !== toursRequestRef.current) return;
+      if (!silent && requestId === toursRequestRef.current) {
+        setTours([]);
+        setCount(0);
+        if (loadError?.message === "Failed to fetch") {
+          loadError.message = localeMode === "ru" ? "Не удалось соединиться с сервером" : "Could not reach the server";
+        }
+      }
       if (!silent) setError(loadError.message || "Не удалось загрузить путёвки");
     } finally {
-      if (!silent) setIsLoading(false);
+      if (!silent && requestId === toursRequestRef.current) setIsLoading(false);
     }
   }
 
@@ -675,6 +795,158 @@ function App() {
   const resetFilters = () => { setFilters({ query: "", city: "", price: "", sort: "price_asc", categories: [] }); setSearchInput(""); setCityInput(""); setCurrentPage(1); };
   const toggleCategory = (categoryId) => { setFilters((prev) => ({ ...prev, categories: prev.categories.includes(categoryId) ? prev.categories.filter((item) => item !== categoryId) : [...prev.categories, categoryId] })); setCurrentPage(1); };
   const openTourLink = (url) => { const normalized = String(url || "").trim(); if (normalized && normalized !== "#") window.open(normalized, "_blank", "noopener,noreferrer"); };
+  const closeDetail = () => {
+    setDetailModalTour(null);
+    setDetailData(null);
+    setDetailError("");
+    setBookingError("");
+    setBookingSuccess("");
+    setIsBookingPending(false);
+  };
+  const closeReviews = () => { setReviewModalTour(null); setReviewItems([]); setReviewsError(""); };
+  const openAuthModal = (mode = "login") => { setAuthMode(mode); setAuthError(""); setIsAuthModalOpen(true); };
+  const closeAuthModal = () => { setIsAuthModalOpen(false); setAuthError(""); };
+
+  async function openTourDetails(event, tour) {
+    if (event) event.stopPropagation();
+    setDetailModalTour(tour);
+    setDetailData(null);
+    setDetailError("");
+    setBookingError("");
+    setBookingSuccess("");
+    setBookingForm((prev) => ({ ...prev, comment: "" }));
+    setIsDetailLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (tour?.id) params.set("tourId", tour.id);
+      if (tour?.link) params.set("link", tour.link);
+      const response = await fetch(`/api/tour-detail?${params.toString()}`);
+      if (!response.ok) throw new Error(localeMode === "ru" ? "Не удалось открыть объект" : "Could not open property");
+      const payload = await response.json();
+      setDetailData(payload.detail || payload);
+    } catch (detailLoadError) {
+      setDetailError(detailLoadError.message || (localeMode === "ru" ? "Не удалось загрузить детали" : "Could not load details"));
+    } finally {
+      setIsDetailLoading(false);
+    }
+  }
+
+  async function openReviews(event, tour) {
+    event.stopPropagation();
+    setReviewModalTour(tour);
+    setReviewItems([]);
+    setReviewsError("");
+    setIsReviewsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (tour?.id) params.set("tourId", tour.id);
+      if (tour?.link) params.set("link", tour.link);
+      const response = await fetch(`/api/reviews?${params.toString()}`);
+      if (!response.ok) throw new Error(localeMode === "ru" ? "Не удалось загрузить отзывы" : "Could not load reviews");
+      const payload = await response.json();
+      setReviewItems(Array.isArray(payload.reviews) ? payload.reviews : []);
+    } catch (reviewsLoadError) {
+      setReviewsError(reviewsLoadError.message || (localeMode === "ru" ? "Не удалось загрузить отзывы" : "Could not load reviews"));
+    } finally {
+      setIsReviewsLoading(false);
+    }
+  }
+
+  async function submitBooking(event) {
+    event.preventDefault();
+    if (!detailModalTour) return;
+    const customerName = String(bookingForm.customerName || "").trim();
+    const phone = String(bookingForm.phone || "").trim();
+    const email = String(bookingForm.email || "").trim();
+    const comment = String(bookingForm.comment || "").trim();
+    if (!customerName || !phone) {
+      setBookingError(localeMode === "ru" ? "Заполните имя и телефон." : "Fill name and phone.");
+      return;
+    }
+
+    setIsBookingPending(true);
+    setBookingError("");
+    setBookingSuccess("");
+    try {
+      const response = await fetch("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tourId: detailModalTour.id,
+          link: detailModalTour.link,
+          title: detailModalTour.title,
+          city: detailModalTour.city,
+          region: detailModalTour.region,
+          pricePerPerson: Number(detailModalTour.pricePerPerson || detailData?.prices?.[0]?.price || 0),
+          nights: planner.nights,
+          people: planner.people,
+          customerName,
+          phone,
+          email,
+          comment,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.message || (localeMode === "ru" ? "Не удалось сохранить бронь" : "Could not save booking"));
+      }
+      setBookingSuccess(localeMode === "ru" ? "Бронь сохранена. Мы получили заявку." : "Booking saved. We received the request.");
+      setBookingForm({ customerName: "", phone: "", email: "", comment: "" });
+    } catch (bookingRequestError) {
+      setBookingError(bookingRequestError.message || (localeMode === "ru" ? "Не удалось сохранить бронь" : "Could not save booking"));
+    } finally {
+      setIsBookingPending(false);
+    }
+  }
+
+  async function submitAuth(event) {
+    event.preventDefault();
+    const username = String(authForm.username || "").trim();
+    const password = String(authForm.password || "");
+    const confirmPassword = String(authForm.confirmPassword || "");
+
+    if (!username || !password) {
+      setAuthError(copy.authRequired);
+      return;
+    }
+    if (authMode === "register" && password !== confirmPassword) {
+      setAuthError(copy.authPasswordMismatch);
+      return;
+    }
+
+    setIsAuthPending(true);
+    setAuthError("");
+    try {
+      const endpoint = authMode === "register" ? "/api/auth/register" : "/api/auth/login";
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.message || (localeMode === "ru" ? "Не удалось выполнить вход" : "Could not complete authentication"));
+      }
+      setCurrentUser({ username: payload.username });
+      setAuthForm({ username: "", password: "", confirmPassword: "" });
+      setIsAuthModalOpen(false);
+    } catch (authRequestError) {
+      setAuthError(authRequestError.message || (localeMode === "ru" ? "Не удалось выполнить вход" : "Could not complete authentication"));
+    } finally {
+      setIsAuthPending(false);
+    }
+  }
+
+  async function logoutUser() {
+    try {
+      const response = await fetch("/api/auth/logout", { method: "POST" });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) throw new Error();
+      setCurrentUser(null);
+    } catch (_error) {
+      setAuthError(localeMode === "ru" ? "Не удалось выйти из аккаунта" : "Could not log out");
+    }
+  }
 
   return html`
     <div className="shell" ref=${shellRef} onMouseMove=${(event) => {
@@ -714,6 +986,9 @@ function App() {
                 <button className=${localeMode === "ru" ? "switcher__button switcher__button--active" : "switcher__button"} type="button" onClick=${() => setLocaleMode("ru")}>RU</button>
                 <button className=${localeMode === "eu" ? "switcher__button switcher__button--active" : "switcher__button"} type="button" onClick=${() => setLocaleMode("eu")}>EU</button>
               </div>
+              ${currentUser
+                ? html`<div className="auth-strip"><span className="auth-chip">${currentUser.username}</span><button className="action-button action-button--ghost action-button--small" type="button" onClick=${logoutUser}>${copy.authLogout}</button></div>`
+                : html`<button className="action-button action-button--ghost action-button--small" type="button" onClick=${() => openAuthModal("login")}>${copy.authOpen}</button>`}
             </div>
             <h1>${copy.title}</h1>
             <p className="hero-copy">${copy.heroCopy}</p>
@@ -798,11 +1073,11 @@ function App() {
             ${isLoading
               ? html`<div className=${viewMode === "list" ? "catalog catalog--list" : "catalog catalog--grid"}>${Array.from({ length: 8 }).map((_, index) => html`<div key=${`skeleton_${index}`} className="card offer-card skeleton" style=${{ "--card-delay": `${index * 50}ms` }}></div>`)}</div>`
               : tours.length
-                ? html`<div className=${viewMode === "list" ? "catalog catalog--list" : "catalog catalog--grid"}>${tours.map((tour, index) => html`
-                    <article key=${tour.id} className="card offer-card" role="link" tabIndex="0" style=${{ "--card-delay": `${index * 40}ms` }} onClick=${() => openTourLink(tour.link)} onKeyDown=${(event) => {
+                  ? html`<div className=${viewMode === "list" ? "catalog catalog--list" : "catalog catalog--grid"}>${tours.map((tour, index) => html`
+                    <article key=${tour.id} className="card offer-card" role="button" tabIndex="0" style=${{ "--card-delay": `${index * 40}ms` }} onClick=${(event) => openTourDetails(event, tour)} onKeyDown=${(event) => {
                       if (event.key === "Enter" || event.key === " ") {
                         event.preventDefault();
-                        openTourLink(tour.link);
+                        openTourDetails(event, tour);
                       }
                     }}>
                       <div className="offer-card__photo-wrap">
@@ -826,7 +1101,11 @@ function App() {
                       </div>
                       <h3>${tour.title}</h3>
                       <div className="offer-card__chips">${(tour.categories || []).slice(0, 4).map((categoryId) => html`<span key=${`${tour.id}_${categoryId}`} className="soft-mark">${categoryMap.get(categoryId) || categoryId}</span>`)}</div>
-                      <div className="offer-card__bottom"><div className="offer-card__price"><strong>${formatPrice(tour.pricePerPerson)}</strong><span>${copy.exactPrice}</span></div><a href=${tour.link} target="_blank" rel="noreferrer" onClick=${(event) => event.stopPropagation()}>${copy.open}</a></div>
+                      <div className="offer-card__review-bar">
+                        <button className="offer-card__reviews-button" type="button" onClick=${(event) => openReviews(event, tour)}>${copy.reviewButton}</button>
+                        ${(tour.ratingValue || tour.reviewCount) ? html`<span className="offer-card__reviews-meta">${tour.ratingValue ? `★ ${Number(tour.ratingValue).toFixed(1)}` : ""}${tour.reviewCount ? `${tour.ratingValue ? " · " : ""}${copy.reviewCount(tour.reviewCount)}` : ""}</span>` : null}
+                      </div>
+                      <div className="offer-card__bottom"><div className="offer-card__price"><strong>${formatPrice(tour.pricePerPerson)}</strong><span>${copy.exactPrice}</span></div><button className="offer-card__open-button" type="button" onClick=${(event) => openTourDetails(event, tour)}>${localeMode === "ru" ? "подробнее" : "details"}</button></div>
                     </article>`)}
                   </div>`
                 : html`<div className="card notice">${copy.noOptions}</div>`}
@@ -847,6 +1126,121 @@ function App() {
           </aside>
         </main>
       </div>
+      ${detailModalTour ? html`
+        <div className="modal-backdrop" role="presentation" onClick=${closeDetail}>
+          <section className="modal-card modal-card--detail" role="dialog" aria-modal="true" aria-label=${localeMode === "ru" ? "Карточка объекта" : "Property details"} onClick=${(event) => event.stopPropagation()}>
+            <div className="modal-card__head">
+              <div>
+                <span className="modal-card__eyebrow">${localeMode === "ru" ? "объект" : "property"}</span>
+                <h3 className="modal-card__title">${detailModalTour.title}</h3>
+                <p className="modal-card__place">${displayText(placeLabelFromTour(detailModalTour))}</p>
+              </div>
+              <button className="modal-card__close" type="button" onClick=${closeDetail}>${copy.close}</button>
+            </div>
+            <div className="modal-card__body">
+              ${isDetailLoading ? html`<div className="modal-card__notice">${localeMode === "ru" ? "Загружаем объект..." : "Loading property..."}</div>` : null}
+              ${!isDetailLoading && detailError ? html`<div className="modal-card__notice modal-card__notice--error">${detailError}</div>` : null}
+              ${!isDetailLoading && !detailError ? html`
+                <div className="detail-layout">
+                  <div className="detail-layout__main">
+                    <div className="detail-gallery">
+                      ${(detailData?.photos?.length ? detailData.photos : [getTourPhotoUrl(detailModalTour)]).slice(0, 12).map((photo, index) => html`<img key=${`${detailModalTour.id || detailModalTour.link}_${index}`} className="detail-gallery__photo" src=${photo} alt=${detailModalTour.title} loading="lazy" decoding="async" />`)}
+                    </div>
+                    ${detailData?.description ? html`<section className="detail-section"><h4>${localeMode === "ru" ? "Описание" : "Description"}</h4><p>${detailData.description}</p></section>` : null}
+                    ${detailData?.food ? html`<section className="detail-section"><h4>${localeMode === "ru" ? "Питание" : "Food"}</h4><p>${detailData.food}</p></section>` : null}
+                    ${detailData?.infrastructure?.length ? html`<section className="detail-section"><h4>${localeMode === "ru" ? "Инфраструктура" : "Infrastructure"}</h4><div className="detail-bullets">${detailData.infrastructure.map((item, index) => html`<span key=${`${detailModalTour.id}_infra_${index}`} className="soft-mark">${item}</span>`)}</div></section>` : null}
+                    <section className="detail-section"><div className="detail-section__head"><h4>${localeMode === "ru" ? "Цены" : "Prices"}</h4><button className="offer-card__reviews-button" type="button" onClick=${(event) => openReviews(event, detailModalTour)}>${copy.reviewButton}</button></div><div className="detail-price-list">${(detailData?.prices?.length ? detailData.prices : [{ title: detailModalTour.title, price: detailModalTour.pricePerPerson, currency: "RUB", image: getTourPhotoUrl(detailModalTour) }]).map((item, index) => html`<article key=${`${detailModalTour.id}_price_${index}`} className="detail-price-card"><div>${item.title ? html`<strong>${item.title}</strong>` : null}${item.description ? html`<p>${item.description}</p>` : null}</div><span>${formatMoney(item.price)}</span></article>`)}</div></section>
+                  </div>
+                  <aside className="detail-layout__aside">
+                    <section className="detail-section detail-section--booking">
+                      <span className="detail-booking__eyebrow">${localeMode === "ru" ? "бронь на сайте" : "booking on site"}</span>
+                      <div className="detail-booking__top">
+                        <h4>${localeMode === "ru" ? "Забронировать" : "Book now"}</h4>
+                        <div className="detail-booking__badge">${localeMode === "ru" ? "в базу" : "to database"}</div>
+                      </div>
+                      <div className="detail-booking__meta">
+                        <span>${planner.nights} ${localeMode === "ru" ? "ночей" : "nights"}</span>
+                        <span>${planner.people} ${localeMode === "ru" ? "чел." : "guests"}</span>
+                        <strong>${formatMoney((Number(detailModalTour.pricePerPerson || detailData?.prices?.[0]?.price || 0) * Math.max(planner.people, 1)) || 0)}</strong>
+                      </div>
+                      <form className="auth-form detail-booking-form" onSubmit=${submitBooking}>
+                        <label className="auth-form__field"><span>${localeMode === "ru" ? "Имя" : "Name"}</span><input value=${bookingForm.customerName} onInput=${(event) => setBookingForm((prev) => ({ ...prev, customerName: event.target.value }))} placeholder=${localeMode === "ru" ? "Как к вам обращаться" : "Your name"} /></label>
+                        <label className="auth-form__field"><span>${localeMode === "ru" ? "Телефон" : "Phone"}</span><input value=${bookingForm.phone} onInput=${(event) => setBookingForm((prev) => ({ ...prev, phone: event.target.value }))} placeholder=${localeMode === "ru" ? "+7..." : "+7..."} /></label>
+                        <label className="auth-form__field"><span>Email</span><input value=${bookingForm.email} onInput=${(event) => setBookingForm((prev) => ({ ...prev, email: event.target.value }))} placeholder="mail@example.com" /></label>
+                        <label className="auth-form__field"><span>${localeMode === "ru" ? "Комментарий" : "Comment"}</span><textarea rows="4" value=${bookingForm.comment} onInput=${(event) => setBookingForm((prev) => ({ ...prev, comment: event.target.value }))} placeholder=${localeMode === "ru" ? "Пожелания по брони" : "Booking notes"}></textarea></label>
+                        ${bookingError ? html`<div className="modal-card__notice modal-card__notice--error">${bookingError}</div>` : null}
+                        ${bookingSuccess ? html`<div className="modal-card__notice">${bookingSuccess}</div>` : null}
+                        <div className="detail-actions">
+                          <button className="action-button action-button--primary" type="submit" disabled=${isBookingPending}>${isBookingPending ? (localeMode === "ru" ? "сохраняем..." : "saving...") : (localeMode === "ru" ? "забронировать" : "book")}</button>
+                          <button className="action-button action-button--ghost" type="button" onClick=${() => openTourLink(detailModalTour.link)}>${copy.open}</button>
+                        </div>
+                      </form>
+                    </section>
+                  </aside>
+                </div>` : null}
+            </div>
+          </section>
+        </div>` : null}
+      ${reviewModalTour ? html`
+        <div className="modal-backdrop" role="presentation" onClick=${closeReviews}>
+          <section className="modal-card" role="dialog" aria-modal="true" aria-label=${copy.reviewsTitle} onClick=${(event) => event.stopPropagation()}>
+            <div className="modal-card__head">
+              <div>
+                <span className="modal-card__eyebrow">${copy.reviewsTitle}</span>
+                <h3 className="modal-card__title">${reviewModalTour.title}</h3>
+                <p className="modal-card__place">${displayText(placeLabelFromTour(reviewModalTour))}</p>
+              </div>
+              <button className="modal-card__close" type="button" onClick=${closeReviews}>${copy.close}</button>
+            </div>
+            <div className="modal-card__body">
+              ${isReviewsLoading ? html`<div className="modal-card__notice">${copy.reviewsLoading}</div>` : null}
+              ${!isReviewsLoading && reviewsError ? html`<div className="modal-card__notice modal-card__notice--error">${reviewsError}</div>` : null}
+              ${!isReviewsLoading && !reviewsError && !reviewItems.length ? html`<div className="modal-card__notice">${copy.reviewsEmpty}</div>` : null}
+              ${!isReviewsLoading && !reviewsError && reviewItems.length ? html`<div className="review-list">${reviewItems.map((item, index) => html`
+                <article key=${`${reviewModalTour.id || reviewModalTour.link}_${index}`} className="review-item">
+                  <div className="review-item__head">
+                    <strong>${item.author || copy.guestLabel}</strong>
+                    <span>${[item.rating ? `★ ${Number(item.rating).toFixed(1)}` : "", formatReviewDate(item.date, localeCode)].filter(Boolean).join(" · ")}</span>
+                  </div>
+                  ${item.title ? html`<h4>${item.title}</h4>` : null}
+                  <p>${item.text}</p>
+                </article>`)}
+              </div>` : null}
+            </div>
+            <div className="modal-card__foot">
+              <a href=${reviewModalTour.link} target="_blank" rel="noreferrer" onClick=${(event) => event.stopPropagation()}>${copy.reviewsOpen}</a>
+            </div>
+          </section>
+        </div>` : null}
+      ${isAuthModalOpen ? html`
+        <div className="modal-backdrop" role="presentation" onClick=${closeAuthModal}>
+          <section className="modal-card modal-card--auth" role="dialog" aria-modal="true" aria-label=${copy.authTitle} onClick=${(event) => event.stopPropagation()}>
+            <div className="modal-card__head">
+              <div>
+                <span className="modal-card__eyebrow">${copy.authTitle}</span>
+                <h3 className="modal-card__title">${copy.authTitle}</h3>
+                <p className="modal-card__place">${copy.authSubtitle}</p>
+              </div>
+              <button className="modal-card__close" type="button" onClick=${closeAuthModal}>${copy.close}</button>
+            </div>
+            <div className="modal-card__body">
+              <div className="switcher">
+                <button className=${authMode === "login" ? "switcher__button switcher__button--active" : "switcher__button"} type="button" onClick=${() => { setAuthMode("login"); setAuthError(""); }}>${copy.authLoginTab}</button>
+                <button className=${authMode === "register" ? "switcher__button switcher__button--active" : "switcher__button"} type="button" onClick=${() => { setAuthMode("register"); setAuthError(""); }}>${copy.authRegisterTab}</button>
+              </div>
+              ${currentUser ? html`<div className="modal-card__notice">${copy.authLoggedIn(currentUser.username)}</div>` : html`
+                <form className="auth-form" onSubmit=${submitAuth}>
+                  <label className="search-field"><span>${copy.usernameLabel}</span><input className="search-control" value=${authForm.username} onInput=${(event) => setAuthForm((prev) => ({ ...prev, username: event.target.value }))} placeholder=${copy.usernamePlaceholder} autoComplete="username" /></label>
+                  <label className="search-field"><span>${copy.passwordLabel}</span><input className="search-control" type="password" value=${authForm.password} onInput=${(event) => setAuthForm((prev) => ({ ...prev, password: event.target.value }))} placeholder=${copy.passwordPlaceholder} autoComplete=${authMode === "login" ? "current-password" : "new-password"} /></label>
+                  ${authMode === "register" ? html`<label className="search-field"><span>${copy.confirmPasswordLabel}</span><input className="search-control" type="password" value=${authForm.confirmPassword} onInput=${(event) => setAuthForm((prev) => ({ ...prev, confirmPassword: event.target.value }))} placeholder=${copy.confirmPasswordPlaceholder} autoComplete="new-password" /></label>` : null}
+                  ${authError ? html`<div className="modal-card__notice modal-card__notice--error">${authError}</div>` : null}
+                  <div className="auth-form__actions">
+                    <button className="action-button action-button--primary" type="submit" disabled=${isAuthPending}>${isAuthPending ? "..." : authMode === "register" ? copy.authRegisterAction : copy.authLoginAction}</button>
+                  </div>
+                </form>`}
+            </div>
+          </section>
+        </div>` : null}
     </div>
   `;
 }

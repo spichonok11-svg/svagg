@@ -2,10 +2,14 @@
   "name": "putevka",
   "version": "2.0.0",
   "private": true,
-  "description": "Putevka: React + Django + Go",
+  "description": "Putevka: frontend + Go backend",
   "scripts": {
-    "dev": ".venv\\Scripts\\python.exe django_backend\\manage.py runserver 8000",
-    "start": ".venv\\Scripts\\python.exe django_backend\\manage.py runserver 8000",
+    "dev": "cd go_backend && \"C:\\Program Files\\Go\\bin\\go.exe\" build -o putevka-go.exe . && .\\putevka-go.exe",
+    "start": "cd go_backend && \"C:\\Program Files\\Go\\bin\\go.exe\" build -o putevka-go.exe . && .\\putevka-go.exe",
+    "django:dev": ".venv\\Scripts\\python.exe django_backend\\manage.py runserver 8000",
+    "django:start": ".venv\\Scripts\\python.exe django_backend\\manage.py runserver 8000",
+    "go:dev": "cd go_backend && \"C:\\Program Files\\Go\\bin\\go.exe\" build -o putevka-go.exe . && .\\putevka-go.exe",
+    "go:start": "cd go_backend && \"C:\\Program Files\\Go\\bin\\go.exe\" build -o putevka-go.exe . && .\\putevka-go.exe",
     "check": ".venv\\Scripts\\python.exe django_backend\\manage.py check",
     "test": ".venv\\Scripts\\python.exe django_backend\\manage.py test tours"
   }

@@ -20,11 +20,13 @@ from .constants import VALID_CATEGORY_IDS
 
 DATA_FILE = Path(settings.PROJECT_ROOT) / "data" / "offers.json"
 SNAPSHOT_FILE = Path(settings.PROJECT_ROOT) / "data" / "live_cache_snapshot.json"
+PARTIAL_SNAPSHOT_FILE = Path(settings.PROJECT_ROOT) / "data" / "live_cache_progress.json"
 TOKEN_PATTERN = re.compile(r"[a-zA-Zа-яА-ЯёЁ0-9]+")
 SCRIPT_JSONLD_RE = re.compile(
     r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
     re.IGNORECASE | re.DOTALL,
 )
+MAX_REASONABLE_PRICE_PER_PERSON = 999_999
 VALID_SORTS = {"price_asc", "price_desc", "days_asc", "days_desc"}
 REQUEST_HEADERS = {
     "User-Agent": (
@@ -159,6 +161,7 @@ _refresh_thread = None
 _live_page_cache = {}
 _live_page_cache_lock = threading.RLock()
 _sitemap_cache = {"urls": [], "expiresAt": 0.0}
+_review_cache = {}
 
 _result_cache = {}
 _result_cache_hits = 0
@@ -176,6 +179,15 @@ def _safe_int(value):
         return None
     try:
         return int(float(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_float(value):
+    if value in (None, ""):
+        return None
+    try:
+        return round(float(value), 1)
     except (TypeError, ValueError):
         return None
 
@@ -517,6 +529,116 @@ def _extract_night_values_from_html(html: str) -> tuple[int | None, int | None]:
     return min_nights, selected_nights
 
 
+def _extract_review_node(value):
+    if isinstance(value, list):
+        for item in value:
+            extracted = _extract_review_node(item)
+            if extracted:
+                return extracted
+        return {}
+
+    if isinstance(value, str):
+        text = value.strip()
+        return {"text": text} if text else {}
+
+    if not isinstance(value, dict):
+        return {}
+
+    text = (
+        str(value.get("reviewBody", "")).strip()
+        or str(value.get("description", "")).strip()
+        or str(value.get("name", "")).strip()
+    )
+    author_raw = value.get("author", {})
+    if isinstance(author_raw, dict):
+        author = str(author_raw.get("name", "")).strip()
+    else:
+        author = str(author_raw or "").strip()
+
+    if text or author:
+        return {"text": text, "author": author}
+
+    for nested_key in ("review", "itemReviewed"):
+        extracted = _extract_review_node(value.get(nested_key))
+        if extracted:
+            return extracted
+    return {}
+
+
+def _normalize_review_entry(review_like, fallback_author: str = "") -> dict | None:
+    if isinstance(review_like, str):
+        text = review_like.strip()
+        if not text:
+            return None
+        return {
+            "author": fallback_author,
+            "text": text,
+            "rating": None,
+            "date": "",
+            "title": "",
+        }
+
+    if not isinstance(review_like, dict):
+        return None
+
+    text = (
+        str(review_like.get("reviewBody", "")).strip()
+        or str(review_like.get("description", "")).strip()
+        or str(review_like.get("text", "")).strip()
+    )
+    title = str(review_like.get("name", "")).strip()
+    author_raw = review_like.get("author", {})
+    if isinstance(author_raw, dict):
+        author = str(author_raw.get("name", "")).strip()
+    else:
+        author = str(author_raw or fallback_author or "").strip()
+
+    review_rating = review_like.get("reviewRating", {}) or {}
+    if isinstance(review_rating, dict):
+        rating = _safe_float(review_rating.get("ratingValue"))
+    else:
+        rating = _safe_float(review_rating)
+    date = str(review_like.get("datePublished", "")).strip()
+
+    if not any([text, title, author, rating, date]):
+        return None
+
+    return {
+        "author": author,
+        "text": text or title,
+        "rating": rating,
+        "date": date,
+        "title": title,
+    }
+
+
+def _collect_reviews_from_node(node, collected: list[dict]):
+    if isinstance(node, list):
+        for item in node:
+            _collect_reviews_from_node(item, collected)
+        return
+
+    if not isinstance(node, dict):
+        return
+
+    current_type = node.get("@type")
+    if current_type == "Review" or (isinstance(current_type, list) and "Review" in current_type):
+        normalized = _normalize_review_entry(node)
+        if normalized:
+            collected.append(normalized)
+
+    if "review" in node:
+        review_value = node.get("review")
+        normalized = _normalize_review_entry(review_value)
+        if normalized:
+            collected.append(normalized)
+        _collect_reviews_from_node(review_value, collected)
+
+    for value in node.values():
+        if isinstance(value, (dict, list)):
+            _collect_reviews_from_node(value, collected)
+
+
 def _normalize_live_offer(
     offer_data: dict,
     page_url: str,
@@ -527,6 +649,8 @@ def _normalize_live_offer(
 ):
     raw_price = _safe_int(offer_data.get("price"))
     if raw_price is None or raw_price <= 0:
+        return None
+    if raw_price > MAX_REASONABLE_PRICE_PER_PERSON:
         return None
 
     title = _build_live_title(offer_data, product_data)
@@ -539,6 +663,11 @@ def _normalize_live_offer(
     page_context = page_context or {}
     rating_info = offer_data.get("aggregateRating", {}) or {}
     reviewed = rating_info.get("itemReviewed", {}) or {}
+    review_payload = (
+        _extract_review_node(offer_data.get("review"))
+        or _extract_review_node((product_data or {}).get("review"))
+        or _extract_review_node(reviewed.get("review"))
+    )
     address = reviewed.get("address", {}) or {}
     country = _extract_country_from_address(address) or str(page_context.get("country", "")).strip()
     if country:
@@ -601,6 +730,10 @@ def _normalize_live_offer(
         "hasHotel": "with_hotel" in categories,
         "hasPool": "with_pool" in categories,
         "description": description,
+        "reviewText": review_payload.get("text", "") or description,
+        "reviewAuthor": review_payload.get("author", ""),
+        "ratingValue": _safe_float(rating_info.get("ratingValue")),
+        "reviewCount": _safe_int(rating_info.get("reviewCount") or rating_info.get("ratingCount")),
         "image": image_url,
         "link": url,
         "_search": search_text,
@@ -642,6 +775,53 @@ def _extract_live_offers_from_html(html: str, page_url: str) -> list[dict]:
     return extracted
 
 
+def _extract_reviews_from_html(html: str, page_url: str) -> list[dict]:
+    json_blocks = _parse_jsonld_blocks(html)
+    collected = []
+    for json_block in json_blocks:
+        _collect_reviews_from_node(json_block, collected)
+
+    deduped = []
+    seen = set()
+    for item in collected:
+        text = str(item.get("text", "")).strip()
+        author = str(item.get("author", "")).strip()
+        title = str(item.get("title", "")).strip()
+        key = (text.lower(), author.lower(), title.lower())
+        if not any(key):
+            continue
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(
+            {
+                "author": author,
+                "text": text,
+                "rating": item.get("rating"),
+                "date": str(item.get("date", "")).strip(),
+                "title": title,
+            }
+        )
+
+    if deduped:
+        return deduped
+
+    page_context = _extract_page_context(json_blocks, page_url=page_url)
+    fallback_text = str(page_context.get("description", "")).strip()
+    if fallback_text:
+        return [
+            {
+                "author": "",
+                "text": fallback_text,
+                "rating": None,
+                "date": "",
+                "title": str(page_context.get("name", "")).strip(),
+            }
+        ]
+
+    return []
+
+
 def _fetch_live_page(page_url: str) -> list[dict]:
     if not _is_russian_page_url(page_url):
         return []
@@ -664,6 +844,31 @@ def _fetch_live_page(page_url: str) -> list[dict]:
             "offers": list(offers),
         }
     return offers
+
+
+def _fetch_reviews_for_url(page_url: str) -> list[dict]:
+    normalized_url = str(page_url or "").strip()
+    if not normalized_url:
+        return []
+
+    cache_ttl = max(60, int(getattr(settings, "PUTEVKA_PAGE_CACHE_TTL_SECONDS", 1800) or 1800))
+    cache_now = time.time()
+    with _live_page_cache_lock:
+        cached_entry = _review_cache.get(normalized_url)
+    if cached_entry and cached_entry["expiresAt"] > cache_now:
+        return list(cached_entry["reviews"])
+
+    request = Request(normalized_url, headers=REQUEST_HEADERS)
+    timeout_seconds = max(5, int(getattr(settings, "PUTEVKA_FETCH_TIMEOUT_SECONDS", 12) or 12))
+    with urlopen(request, timeout=timeout_seconds) as response:
+        html = response.read().decode("utf-8", errors="ignore")
+    reviews = _extract_reviews_from_html(html, normalized_url)
+    with _live_page_cache_lock:
+        _review_cache[normalized_url] = {
+            "expiresAt": cache_now + cache_ttl,
+            "reviews": list(reviews),
+        }
+    return reviews
 
 
 def _fetch_live_pages(page_urls: list[str], max_workers: int = 10) -> list[dict]:
@@ -802,6 +1007,8 @@ def _normalize_record(record, source_name: str):
     price_per_person = _safe_int(record.get("pricePerPerson"))
     if price_per_person is None:
         return None
+    if price_per_person > MAX_REASONABLE_PRICE_PER_PERSON:
+        return None
 
     country = str(record.get("country", "")).lower()
     if "росс" not in country and "russia" not in country:
@@ -820,6 +1027,10 @@ def _normalize_record(record, source_name: str):
     city = str(record.get("city", "")).strip() or region
     description = str(record.get("description", ""))
     image = str(record.get("image", "")).strip()
+    review_text = str(record.get("reviewText") or description or "").strip()
+    review_author = str(record.get("reviewAuthor", "")).strip()
+    rating_value = _safe_float(record.get("ratingValue"))
+    review_count = _safe_int(record.get("reviewCount"))
     search_text = " ".join([title, city, region, description]).lower()
     min_nights = _safe_int(record.get("minNights")) or _safe_int(record.get("days")) or 1
     days = _safe_int(record.get("days")) or min_nights
@@ -838,6 +1049,10 @@ def _normalize_record(record, source_name: str):
         "hasHotel": "with_hotel" in categories,
         "hasPool": "with_pool" in categories,
         "description": description,
+        "reviewText": review_text,
+        "reviewAuthor": review_author,
+        "ratingValue": rating_value,
+        "reviewCount": review_count,
         "image": image,
         "link": str(record.get("link", "#")),
         "_search": search_text,
@@ -865,6 +1080,10 @@ def _serialize_tours_for_snapshot(tours: list[dict]) -> list[dict]:
             "minNights": tour.get("minNights"),
             "categories": list(tour.get("categories", [])),
             "description": str(tour.get("description", "")),
+            "reviewText": str(tour.get("reviewText", "")),
+            "reviewAuthor": str(tour.get("reviewAuthor", "")),
+            "ratingValue": tour.get("ratingValue"),
+            "reviewCount": tour.get("reviewCount"),
             "image": str(tour.get("image", "")),
             "link": str(tour.get("link", "#")),
         }
@@ -879,6 +1098,24 @@ def _persist_snapshot(tours: list[dict]):
             json.dumps(_serialize_tours_for_snapshot(tours), ensure_ascii=False),
             encoding="utf-8",
         )
+    except Exception:
+        return
+
+
+def _persist_partial_snapshot(tours: list[dict]):
+    try:
+        PARTIAL_SNAPSHOT_FILE.parent.mkdir(parents=True, exist_ok=True)
+        PARTIAL_SNAPSHOT_FILE.write_text(
+            json.dumps(_serialize_tours_for_snapshot(tours), ensure_ascii=False),
+            encoding="utf-8",
+        )
+    except Exception:
+        return
+
+
+def _clear_partial_snapshot():
+    try:
+        PARTIAL_SNAPSHOT_FILE.unlink(missing_ok=True)
     except Exception:
         return
 
@@ -965,8 +1202,11 @@ def _apply_partial_cache_unlocked(tours: list[dict], source_name: str, refresh_n
     _cache_generation += 1
     _last_refresh_note = refresh_note
     _reset_query_cache_unlocked()
-    if source_name.startswith("live_putevka") or source_name == "go":
+    if source_name == "live_putevka" or source_name == "go":
         _persist_snapshot(sorted_tours)
+        _clear_partial_snapshot()
+    elif source_name.startswith("live_putevka_partial"):
+        _persist_partial_snapshot(sorted_tours)
 
 
 def _refresh_status_unlocked() -> dict:
@@ -1576,3 +1816,58 @@ def get_stats():
         }
         payload.update(_refresh_status_unlocked())
         return payload
+
+
+def get_tour_reviews(*, tour_id: str | None = None, link: str | None = None) -> dict:
+    ensure_cache()
+
+    selected_tour = None
+    normalized_link = str(link or "").strip()
+    normalized_id = str(tour_id or "").strip()
+
+    with _cache_lock:
+        if normalized_id:
+            selected_tour = _cached_by_id.get(normalized_id)
+        if selected_tour is None and normalized_link:
+            for item in _cached_tours:
+                if str(item.get("link", "")).strip() == normalized_link:
+                    selected_tour = item
+                    break
+
+    if selected_tour is None:
+        return {
+            "title": "",
+            "link": normalized_link,
+            "reviews": [],
+            "ratingValue": None,
+            "reviewCount": 0,
+        }
+
+    resolved_link = str(selected_tour.get("link", "")).strip() or normalized_link
+    reviews = []
+    if _is_russian_page_url(resolved_link):
+        try:
+            reviews = _fetch_reviews_for_url(resolved_link)
+        except Exception:
+            reviews = []
+
+    if not reviews:
+        fallback_text = str(selected_tour.get("reviewText", "") or selected_tour.get("description", "")).strip()
+        if fallback_text:
+            reviews = [
+                {
+                    "author": str(selected_tour.get("reviewAuthor", "")).strip(),
+                    "text": fallback_text,
+                    "rating": selected_tour.get("ratingValue"),
+                    "date": "",
+                    "title": "",
+                }
+            ]
+
+    return {
+        "title": str(selected_tour.get("title", "")).strip(),
+        "link": resolved_link,
+        "reviews": reviews,
+        "ratingValue": selected_tour.get("ratingValue"),
+        "reviewCount": selected_tour.get("reviewCount") or len(reviews),
+    }

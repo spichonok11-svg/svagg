@@ -1,5 +1,9 @@
+import json
 from pathlib import Path
 
+from django.contrib.auth import authenticate, get_user_model, login, logout
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
@@ -13,8 +17,12 @@ from .services import (
     get_city_suggestions,
     get_query_suggestions,
     get_stats,
+    get_tour_reviews,
     start_background_refresh,
 )
+
+
+User = get_user_model()
 
 
 def _safe_int(value, default):
@@ -22,6 +30,20 @@ def _safe_int(value, default):
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _json_body(request):
+    try:
+        return json.loads(request.body.decode("utf-8") or "{}")
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return {}
+
+
+def _user_payload(user):
+    return {
+        "isAuthenticated": True,
+        "username": user.get_username(),
+    }
 
 
 def index(request):
@@ -144,6 +166,77 @@ def stats(request):
     if request.method != "GET":
         return JsonResponse({"ok": False, "message": "Method not allowed"}, status=405)
     return JsonResponse(get_stats())
+
+
+def reviews(request):
+    if request.method != "GET":
+        return JsonResponse({"ok": False, "message": "Method not allowed"}, status=405)
+    payload = get_tour_reviews(
+        tour_id=request.GET.get("tourId"),
+        link=request.GET.get("link"),
+    )
+    return JsonResponse(payload)
+
+
+def auth_session(request):
+    if request.method != "GET":
+        return JsonResponse({"ok": False, "message": "Method not allowed"}, status=405)
+    if request.user.is_authenticated:
+        return JsonResponse({"ok": True, **_user_payload(request.user)})
+    return JsonResponse({"ok": True, "isAuthenticated": False, "username": ""})
+
+
+@csrf_exempt
+def auth_register(request):
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "message": "Method not allowed"}, status=405)
+
+    payload = _json_body(request)
+    username = str(payload.get("username", "")).strip()
+    password = str(payload.get("password", ""))
+
+    if not username or not password:
+        return JsonResponse({"ok": False, "message": "Логин и пароль обязательны."}, status=400)
+    if User.objects.filter(username=username).exists():
+        return JsonResponse({"ok": False, "message": "Такой логин уже занят."}, status=400)
+
+    user = User(username=username)
+    try:
+        validate_password(password, user=user)
+    except ValidationError as error:
+        return JsonResponse({"ok": False, "message": " ".join(error.messages)}, status=400)
+
+    user = User.objects.create_user(username=username, password=password)
+    login(request, user)
+    return JsonResponse({"ok": True, **_user_payload(user)})
+
+
+@csrf_exempt
+def auth_login(request):
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "message": "Method not allowed"}, status=405)
+
+    payload = _json_body(request)
+    username = str(payload.get("username", "")).strip()
+    password = str(payload.get("password", ""))
+
+    if not username or not password:
+        return JsonResponse({"ok": False, "message": "Логин и пароль обязательны."}, status=400)
+
+    user = authenticate(request, username=username, password=password)
+    if user is None:
+        return JsonResponse({"ok": False, "message": "Неверный логин или пароль."}, status=400)
+
+    login(request, user)
+    return JsonResponse({"ok": True, **_user_payload(user)})
+
+
+@csrf_exempt
+def auth_logout(request):
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "message": "Method not allowed"}, status=405)
+    logout(request)
+    return JsonResponse({"ok": True, "isAuthenticated": False, "username": ""})
 
 
 @csrf_exempt

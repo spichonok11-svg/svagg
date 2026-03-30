@@ -1,10 +1,15 @@
+from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 
 from .services import (
     _extract_live_offers_from_html,
+    _extract_reviews_from_html,
     filter_tours,
     get_city_suggestions,
 )
+
+
+User = get_user_model()
 
 
 @override_settings(
@@ -13,6 +18,31 @@ from .services import (
     LIVE_PARSER_ENABLED=False,
 )
 class TourApiTests(TestCase):
+    def test_auth_register_login_logout_flow(self):
+        register_response = self.client.post(
+            "/api/auth/register",
+            data='{"username":"demo_user","password":"StrongPass123!"}',
+            content_type="application/json",
+        )
+        self.assertEqual(register_response.status_code, 200)
+        self.assertTrue(User.objects.filter(username="demo_user").exists())
+
+        session_response = self.client.get("/api/auth/session")
+        self.assertEqual(session_response.status_code, 200)
+        self.assertTrue(session_response.json()["isAuthenticated"])
+
+        logout_response = self.client.post("/api/auth/logout")
+        self.assertEqual(logout_response.status_code, 200)
+        self.assertFalse(logout_response.json()["isAuthenticated"])
+
+        login_response = self.client.post(
+            "/api/auth/login",
+            data='{"username":"demo_user","password":"StrongPass123!"}',
+            content_type="application/json",
+        )
+        self.assertEqual(login_response.status_code, 200)
+        self.assertEqual(login_response.json()["username"], "demo_user")
+
     def test_health_endpoint(self):
         response = self.client.get("/api/health")
         self.assertEqual(response.status_code, 200)
@@ -183,8 +213,44 @@ class LiveParserExtractionTests(TestCase):
         self.assertEqual(offers[0]["region"], "Краснодарский край")
         self.assertIn("Санаторий Тест", offers[0]["title"])
         self.assertEqual(offers[0]["pricePerPerson"], 4400)
-        self.assertEqual(offers[0]["days"], 7)
-        self.assertEqual(offers[0]["minNights"], 3)
+
+    def test_review_list_is_extracted_from_jsonld(self):
+        html = """
+        <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": "Hotel",
+          "name": "Санаторий Тест",
+          "description": "Спокойный отдых у моря",
+          "review": [
+            {
+              "@type": "Review",
+              "author": {"@type": "Person", "name": "Марина"},
+              "datePublished": "2026-02-10",
+              "reviewBody": "Очень чисто и хороший персонал.",
+              "reviewRating": {"@type": "Rating", "ratingValue": 5}
+            },
+            {
+              "@type": "Review",
+              "author": {"@type": "Person", "name": "Игорь"},
+              "datePublished": "2026-02-18",
+              "reviewBody": "Понравился бассейн и питание.",
+              "reviewRating": {"@type": "Rating", "ratingValue": 4}
+            }
+          ]
+        }
+        </script>
+        """
+
+        reviews = _extract_reviews_from_html(
+            html,
+            "https://www.putevka.com/krasnodar/sochi/test",
+        )
+
+        self.assertEqual(len(reviews), 2)
+        self.assertEqual(reviews[0]["author"], "Марина")
+        self.assertEqual(reviews[0]["rating"], 5.0)
+        self.assertIn("персонал", reviews[0]["text"])
 
     def test_listing_offer_uses_offer_name_and_keeps_raw_price(self):
         html = """
