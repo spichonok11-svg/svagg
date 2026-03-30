@@ -10,7 +10,7 @@ import { createRoot } from "https://esm.sh/react-dom@18.2.0/client";
 import htm from "https://esm.sh/htm@3.1.1";
 
 const html = htm.bind(React.createElement);
-const PAGE_SIZE = 24;
+const PAGE_SIZE = 12;
 const NIGHT_OPTIONS = [3, 5, 7, 10, 14];
 const PEOPLE_OPTIONS = [1, 2, 3, 4, 5, 6];
 const SORT_OPTIONS = [
@@ -309,6 +309,65 @@ function formatMinNights(value, localeMode) {
   return localeMode === "ru"
     ? `от ${nights} ${formatNightWord(nights, localeMode)}`
     : `from ${nights} ${formatNightWord(nights, localeMode)}`;
+}
+
+function placeLabelFromTour(tour) {
+  const city = String(tour?.city || "").trim();
+  const region = String(tour?.region || "").trim();
+  if (city && region && city !== region) return `${city}, ${region}`;
+  return city || region || "Россия";
+}
+
+function hashPhotoSeed(value) {
+  const safe = String(value || "");
+  let hash = 0;
+  for (let index = 0; index < safe.length; index += 1) {
+    hash = (hash << 5) - hash + safe.charCodeAt(index);
+    hash |= 0;
+  }
+  return Math.abs(hash) || 1;
+}
+
+function buildPhotoTags(tour) {
+  const tags = ["travel", "resort", "russia"];
+  const place = normalizeText(`${tour?.city || ""} ${tour?.region || ""}`);
+  const categories = new Set(tour?.categories || []);
+
+  if (categories.has("waterfront")) tags.push("coast", "beach", "sea");
+  if (categories.has("mountains")) tags.push("mountains");
+  if (categories.has("forest")) tags.push("forest");
+  if (categories.has("with_pool")) tags.push("pool");
+  if (categories.has("with_hotel")) tags.push("hotel");
+  if (categories.has("recreation_base")) tags.push("nature");
+
+  if (place.includes("сочи") || place.includes("sochi")) tags.push("sochi", "black-sea");
+  if (place.includes("крым") || place.includes("crimea")) tags.push("crimea");
+  if (place.includes("алтай") || place.includes("altay")) tags.push("altai", "mountain-lake");
+  if (place.includes("карел") || place.includes("karel")) tags.push("karelia", "lakes");
+  if (place.includes("байкал") || place.includes("baikal")) tags.push("baikal");
+  if (place.includes("калининград") || place.includes("kaliningrad")) tags.push("kaliningrad", "baltic");
+  if (place.includes("дагестан") || place.includes("dagestan")) tags.push("dagestan", "caucasus");
+
+  const translitCity = transliterateText(tour?.city || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  if (translitCity) tags.push(translitCity);
+
+  return Array.from(new Set(tags)).slice(0, 6);
+}
+
+function getTourPhotoUrl(tour) {
+  const explicit = String(tour?.image || "").trim();
+  if (explicit) return explicit;
+  const seed = hashPhotoSeed(`${tour?.id || ""}|${tour?.link || ""}|${tour?.title || ""}`);
+  const tagPath = buildPhotoTags(tour).map((tag) => encodeURIComponent(tag)).join(",");
+  return `https://loremflickr.com/960/640/${tagPath}?lock=${seed}`;
+}
+
+function getTourPhotoFallbackUrl(tour) {
+  const seedSource = transliterateText(placeLabelFromTour(tour)).toLowerCase().replace(/\s+/g, "-");
+  return `https://picsum.photos/seed/${encodeURIComponent(seedSource || "russia-trip")}/960/640`;
 }
 
 function App() {
@@ -746,8 +805,23 @@ function App() {
                         openTourLink(tour.link);
                       }
                     }}>
+                      <div className="offer-card__photo-wrap">
+                        <img
+                          className="offer-card__photo"
+                          src=${getTourPhotoUrl(tour)}
+                          alt=${displayText(placeLabelFromTour(tour))}
+                          loading="lazy"
+                          decoding="async"
+                          onError=${(event) => {
+                            const target = event.currentTarget;
+                            if (target.dataset.fallbackApplied === "1") return;
+                            target.dataset.fallbackApplied = "1";
+                            target.src = getTourPhotoFallbackUrl(tour);
+                          }}
+                        />
+                      </div>
                       <div className="offer-card__top">
-                        <p className="offer-card__place">${displayText(tour.city && tour.city !== tour.region ? `${tour.city}, ${tour.region}` : tour.city || tour.region)}</p>
+                        <p className="offer-card__place">${displayText(placeLabelFromTour(tour))}</p>
                         <span className="offer-card__stay">${formatMinNights(tour.minNights || tour.days, localeMode)}</span>
                       </div>
                       <h3>${tour.title}</h3>

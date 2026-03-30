@@ -366,6 +366,35 @@ def _extract_country_from_address(address: dict) -> str:
     return str(raw_country or "").strip()
 
 
+def _extract_image_candidate(value) -> str:
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, list):
+        for item in value:
+            candidate = _extract_image_candidate(item)
+            if candidate:
+                return candidate
+        return ""
+    if isinstance(value, dict):
+        for key in ("url", "contentUrl", "thumbnailUrl", "image", "imageUrl", "photo"):
+            candidate = _extract_image_candidate(value.get(key))
+            if candidate:
+                return candidate
+    return ""
+
+
+def _normalize_image_url(raw_url: str, page_url: str) -> str:
+    normalized = str(raw_url or "").strip()
+    if not normalized:
+        return ""
+    absolute = urljoin(page_url, normalized)
+    parsed = urlparse(absolute)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return ""
+    split = urlsplit(absolute)
+    return urlunsplit((split.scheme, split.netloc, split.path, split.query, ""))
+
+
 def _normalize_locality(locality_value, fallback_city: str) -> str:
     text = str(locality_value or "").strip()
     if not text:
@@ -409,6 +438,7 @@ def _extract_page_context(json_blocks: list[dict | list], page_url: str) -> dict
         "region": _infer_region_from_page(page_url),
         "name": "",
         "description": "",
+        "image": "",
     }
 
     for json_block in json_blocks:
@@ -428,6 +458,10 @@ def _extract_page_context(json_blocks: list[dict | list], page_url: str) -> dict
                     context["description"] = (
                         str(current.get("description", "")).strip() or context["description"]
                     )
+                    context["image"] = _normalize_image_url(
+                        _extract_image_candidate(current.get("image") or current.get("photo")),
+                        page_url=page_url,
+                    ) or context["image"]
                     return context
                 for value in current.values():
                     if isinstance(value, (dict, list)):
@@ -539,6 +573,19 @@ def _normalize_live_offer(
     )
     stable_id = hashlib.md5(f"{url}|{identity}|{raw_price}".encode("utf-8")).hexdigest()[:16]
     search_text = f"{title} {city} {region} {description}".lower()
+    image_url = ""
+    for candidate in (
+        offer_data.get("image"),
+        offer_data.get("photo"),
+        (product_data or {}).get("image"),
+        (product_data or {}).get("photo"),
+        reviewed.get("image"),
+        reviewed.get("photo"),
+        page_context.get("image"),
+    ):
+        image_url = _normalize_image_url(_extract_image_candidate(candidate), page_url=page_url)
+        if image_url:
+            break
 
     return {
         "id": f"putevka_live:{stable_id}",
@@ -554,6 +601,7 @@ def _normalize_live_offer(
         "hasHotel": "with_hotel" in categories,
         "hasPool": "with_pool" in categories,
         "description": description,
+        "image": image_url,
         "link": url,
         "_search": search_text,
         "_tokens": _tokenize(search_text),
@@ -771,6 +819,7 @@ def _normalize_record(record, source_name: str):
     region = str(record.get("region", "Россия"))
     city = str(record.get("city", "")).strip() or region
     description = str(record.get("description", ""))
+    image = str(record.get("image", "")).strip()
     search_text = " ".join([title, city, region, description]).lower()
     min_nights = _safe_int(record.get("minNights")) or _safe_int(record.get("days")) or 1
     days = _safe_int(record.get("days")) or min_nights
@@ -789,6 +838,7 @@ def _normalize_record(record, source_name: str):
         "hasHotel": "with_hotel" in categories,
         "hasPool": "with_pool" in categories,
         "description": description,
+        "image": image,
         "link": str(record.get("link", "#")),
         "_search": search_text,
         "_tokens": _tokenize(search_text),
@@ -815,6 +865,7 @@ def _serialize_tours_for_snapshot(tours: list[dict]) -> list[dict]:
             "minNights": tour.get("minNights"),
             "categories": list(tour.get("categories", [])),
             "description": str(tour.get("description", "")),
+            "image": str(tour.get("image", "")),
             "link": str(tour.get("link", "#")),
         }
         for tour in tours
