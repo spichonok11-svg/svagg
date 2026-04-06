@@ -764,6 +764,7 @@ select.search-control option {
   font: inherit;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  appearance: none;
 }
 .auth-form__field input::placeholder,
 .auth-form__field textarea::placeholder {
@@ -957,6 +958,8 @@ select.search-control option {
   font-weight: 800;
 }
 .detail-section--booking {
+  display: grid;
+  gap: 14px;
   padding: 20px;
   background:
     radial-gradient(circle at top left, rgba(105, 139, 214, 0.12), transparent 34%),
@@ -965,7 +968,7 @@ select.search-control option {
 }
 .detail-booking__eyebrow {
   display: inline-flex;
-  margin-bottom: 10px;
+  margin-bottom: 2px;
   color: var(--accent-soft);
   font-size: 11px;
   font-weight: 900;
@@ -973,7 +976,9 @@ select.search-control option {
   text-transform: uppercase;
 }
 .detail-section--booking h4 {
-  margin-bottom: 0;
+  margin: 0;
+  font-family: "Playfair Display", serif;
+  font-size: 22px;
 }
 .detail-booking__top {
   display: flex;
@@ -997,11 +1002,11 @@ select.search-control option {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  margin-bottom: 16px;
+  margin-bottom: 6px;
   padding: 14px;
   border-radius: 18px;
   border: 1px solid rgba(117, 145, 196, 0.18);
-  background: rgba(28, 37, 53, 0.88);
+  background: linear-gradient(145deg, rgba(28, 37, 53, 0.96), rgba(19, 26, 38, 0.92));
   color: var(--text-muted);
 }
 .detail-booking__meta span {
@@ -1011,12 +1016,13 @@ select.search-control option {
   padding: 10px 12px;
   border-radius: 14px;
   background: rgba(17, 24, 36, 0.72);
+  font-weight: 600;
 }
 .detail-booking__meta strong {
   grid-column: 1 / -1;
   display: block;
-  padding: 6px 2px 0;
-  font-size: clamp(28px, 4vw, 38px);
+  padding: 6px 2px 2px;
+  font-size: clamp(30px, 4.2vw, 44px);
   line-height: 1;
 }
 .detail-actions {
@@ -1027,10 +1033,15 @@ select.search-control option {
 .detail-actions .action-button {
   width: 100%;
   justify-content: center;
+  min-height: 46px;
 }
 .detail-booking-form {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+.detail-booking-form input,
+.detail-booking-form textarea {
+  color-scheme: dark;
 }
 .detail-booking-form .auth-form__field:nth-child(3),
 .detail-booking-form .auth-form__field:nth-child(4),
