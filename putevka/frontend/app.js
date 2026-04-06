@@ -181,7 +181,7 @@ const COPY = {
     themeNight: "Ночь",
   },
   eu: {
-    title: "Putevki Across Russia",
+    title: "Путевки по России",
     eyebrow: "travel route",
     calm: "steady mode",
     heroCopy:
@@ -643,8 +643,8 @@ function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = "night";
     document.documentElement.dataset.locale = localeMode;
-    document.title = copy.title;
-  }, [localeMode, copy.title]);
+    document.title = "Путевки по России";
+  }, [localeMode]);
 
   useEffect(() => {
     function handleKeyDown(event) {
@@ -973,6 +973,11 @@ function App() {
         <div className="stage-shard stage-shard--a"></div>
       </div>
       <div className="shell__inner">
+        <div className="shell__corner-auth">
+          ${currentUser
+            ? html`<div className="auth-strip auth-strip--corner"><span className="auth-chip">${currentUser.username}</span><button className="action-button action-button--ghost action-button--small" type="button" onClick=${logoutUser}>${copy.authLogout}</button></div>`
+            : html`<div className="auth-strip auth-strip--corner"><button className="action-button action-button--ghost action-button--small" type="button" onClick=${() => openAuthModal("login")}>${copy.authOpen}</button><button className="action-button action-button--primary action-button--small" type="button" onClick=${() => openAuthModal("register")}>${copy.authRegisterTab}</button></div>`}
+        </div>
         <header className="hero-panel">
           <section className="card hero-panel__main">
             <div className="eyebrow-row">
@@ -986,9 +991,6 @@ function App() {
                 <button className=${localeMode === "ru" ? "switcher__button switcher__button--active" : "switcher__button"} type="button" onClick=${() => setLocaleMode("ru")}>RU</button>
                 <button className=${localeMode === "eu" ? "switcher__button switcher__button--active" : "switcher__button"} type="button" onClick=${() => setLocaleMode("eu")}>EU</button>
               </div>
-              ${currentUser
-                ? html`<div className="auth-strip"><span className="auth-chip">${currentUser.username}</span><button className="action-button action-button--ghost action-button--small" type="button" onClick=${logoutUser}>${copy.authLogout}</button></div>`
-                : html`<button className="action-button action-button--ghost action-button--small" type="button" onClick=${() => openAuthModal("login")}>${copy.authOpen}</button>`}
             </div>
             <h1>${copy.title}</h1>
             <p className="hero-copy">${copy.heroCopy}</p>

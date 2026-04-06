@@ -4,6 +4,7 @@ Django settings for config project.
 
 import os
 from pathlib import Path
+from urllib.parse import parse_qsl, urlparse
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 PROJECT_ROOT = BASE_DIR.parent
@@ -66,12 +67,43 @@ WSGI_APPLICATION = "config.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    "default": {
+def _postgres_db_config():
+    database_url = os.getenv("DATABASE_URL", "").strip()
+    if database_url.startswith(("postgres://", "postgresql://")):
+        parsed = urlparse(database_url)
+        return {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": parsed.path.lstrip("/") or os.getenv("POSTGRES_DB", "putevka"),
+            "USER": parsed.username or os.getenv("POSTGRES_USER", "postgres"),
+            "PASSWORD": parsed.password or os.getenv("POSTGRES_PASSWORD", ""),
+            "HOST": parsed.hostname or os.getenv("POSTGRES_HOST", "127.0.0.1"),
+            "PORT": str(parsed.port or os.getenv("POSTGRES_PORT", "5432")),
+            "OPTIONS": {
+                key: value
+                for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+                if value != ""
+            },
+            "CONN_MAX_AGE": int(os.getenv("DB_CONN_MAX_AGE", "60")),
+        }
+
+    if any(os.getenv(key, "").strip() for key in ("POSTGRES_DB", "POSTGRES_HOST", "POSTGRES_USER")):
+        return {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.getenv("POSTGRES_DB", "putevka"),
+            "USER": os.getenv("POSTGRES_USER", "postgres"),
+            "PASSWORD": os.getenv("POSTGRES_PASSWORD", ""),
+            "HOST": os.getenv("POSTGRES_HOST", "127.0.0.1"),
+            "PORT": os.getenv("POSTGRES_PORT", "5432"),
+            "CONN_MAX_AGE": int(os.getenv("DB_CONN_MAX_AGE", "60")),
+        }
+
+    return {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
     }
-}
+
+
+DATABASES = {"default": _postgres_db_config()}
 
 
 # Password validation

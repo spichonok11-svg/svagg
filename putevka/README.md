@@ -10,6 +10,31 @@ npm run dev
 
 Это поднимает Go сервер из [go_backend/main.go](/D:/svagg/putevka/go_backend/main.go) на `http://localhost:8080`.
 
+## PostgreSQL
+
+Теперь проект умеет работать с PostgreSQL.
+
+Для Go backend:
+
+```powershell
+$env:DATABASE_URL="postgres://postgres:postgres@127.0.0.1:5432/putevka?sslmode=disable"
+npm run dev
+```
+
+Для Django backend:
+
+```powershell
+$env:DATABASE_URL="postgres://postgres:postgres@127.0.0.1:5432/putevka?sslmode=disable"
+pip install -r requirements.txt
+python django_backend/manage.py migrate
+npm run django:dev
+```
+
+Если `DATABASE_URL` не задан, проект продолжит работать в локальном fallback-режиме:
+
+- Go backend: SQLite + локальные файлы миграции
+- Django backend: `db.sqlite3`
+
 ## Что уже работает на Go
 
 - отдача текущего фронтенда и статики

@@ -261,9 +261,7 @@ def _is_russian_page_url(page_url: str) -> bool:
     if "putevka.com" not in parsed.netloc:
         return False
     path_parts = _split_page_parts(page_url)
-    if not path_parts:
-        return False
-    return path_parts[0] not in FOREIGN_PAGE_ROOTS
+    return bool(path_parts)
 
 
 def _find_product_nodes(json_data):
@@ -289,13 +287,13 @@ def _infer_region_from_page(page_url: str) -> str:
             return PAGE_REGION_MAP[part]
     if path_parts:
         return _humanize_slug(path_parts[0]) or _humanize_slug(path_parts[-1])
-    return "Россия"
+    return "Мир"
 
 
 def _infer_city_from_page(page_url: str) -> str:
     path_parts = _split_page_parts(page_url)
     if not path_parts:
-        return "Россия"
+        return "Мир"
 
     if len(path_parts) >= 3:
         candidate = path_parts[-2]
@@ -361,6 +359,11 @@ def _is_russia_country(country_value: str) -> bool:
     if not country_text:
         return False
     return "рос" in country_text or "russia" in country_text
+
+
+def _normalize_country_name(country_value: str, fallback: str = "Мир") -> str:
+    normalized = _normalize_display_name(str(country_value or "").strip())
+    return normalized or fallback
 
 
 def _extract_country_from_address(address: dict) -> str:
@@ -670,10 +673,7 @@ def _normalize_live_offer(
     )
     address = reviewed.get("address", {}) or {}
     country = _extract_country_from_address(address) or str(page_context.get("country", "")).strip()
-    if country:
-        if not _is_russia_country(country):
-            return None
-    elif not _is_russian_page_url(page_url):
+    if not country and not _is_russian_page_url(page_url):
         return None
 
     page_city = str(page_context.get("city", "")).strip()
@@ -721,8 +721,8 @@ def _normalize_live_offer(
         "source": "putevka_live",
         "title": title,
         "city": city or region,
-        "region": region or city or "Россия",
-        "country": "Россия",
+        "region": region or city or "Мир",
+        "country": _normalize_country_name(country, fallback="Мир"),
         "pricePerPerson": raw_price,
         "days": selected_nights or min_nights or 7,
         "minNights": min_nights or selected_nights or 1,
@@ -1010,10 +1010,6 @@ def _normalize_record(record, source_name: str):
     if price_per_person > MAX_REASONABLE_PRICE_PER_PERSON:
         return None
 
-    country = str(record.get("country", "")).lower()
-    if "росс" not in country and "russia" not in country:
-        return None
-
     categories = [
         category_id
         for category_id in record.get("categories", [])
@@ -1023,8 +1019,9 @@ def _normalize_record(record, source_name: str):
         return None
 
     title = str(record.get("title", "Путевка по России"))
-    region = str(record.get("region", "Россия"))
+    region = str(record.get("region", "Мир"))
     city = str(record.get("city", "")).strip() or region
+    country = _normalize_country_name(record.get("country", ""), fallback="Мир")
     description = str(record.get("description", ""))
     image = str(record.get("image", "")).strip()
     review_text = str(record.get("reviewText") or description or "").strip()
@@ -1041,7 +1038,7 @@ def _normalize_record(record, source_name: str):
         "title": title,
         "city": city,
         "region": region,
-        "country": "Россия",
+        "country": country,
         "pricePerPerson": price_per_person,
         "days": days,
         "minNights": min_nights,
@@ -1074,7 +1071,7 @@ def _serialize_tours_for_snapshot(tours: list[dict]) -> list[dict]:
             "title": str(tour.get("title", "")),
             "city": str(tour.get("city", "")),
             "region": str(tour.get("region", "")),
-            "country": str(tour.get("country", "Россия")),
+            "country": str(tour.get("country", "Мир")),
             "pricePerPerson": tour.get("pricePerPerson"),
             "days": tour.get("days"),
             "minNights": tour.get("minNights"),

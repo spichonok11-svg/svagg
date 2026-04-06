@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "modernc.org/sqlite"
 )
 
@@ -183,6 +184,8 @@ type App struct {
 	bookingsDBFile  string
 	pythonBin       string
 	workerFile      string
+	dbDriver        string
+	dbDSN           string
 
 	mu                     sync.RWMutex
 	tours                  []Tour
@@ -286,6 +289,8 @@ func newApp() (*App, error) {
 		secret = "putevka-go-session-secret-change-me"
 	}
 
+	dbDriver, dbDSN := resolveDatabaseConfig(filepath.Join(rootDir, "data", "bookings.db"))
+
 	return &App{
 		rootDir:         rootDir,
 		frontend:        filepath.Join(rootDir, "frontend"),
@@ -301,12 +306,27 @@ func newApp() (*App, error) {
 		bookingsDBFile:  filepath.Join(rootDir, "data", "bookings.db"),
 		pythonBin:       filepath.Join(rootDir, ".venv", "Scripts", "python.exe"),
 		workerFile:      filepath.Join(rootDir, "django_backend", "live_refresh_worker.py"),
+		dbDriver:        dbDriver,
+		dbDSN:           dbDSN,
 		users:           map[string]UserRecord{},
 		sessions:        map[string]string{},
 		queryCache:      map[string][]int{},
 		detailCache:     map[string]TourDetail{},
 		sessionSecret:   []byte(secret),
 	}, nil
+}
+
+func resolveDatabaseConfig(defaultSQLitePath string) (string, string) {
+	for _, key := range []string{"GO_BACKEND_DATABASE_URL", "DATABASE_URL", "POSTGRES_DSN"} {
+		value := strings.TrimSpace(os.Getenv(key))
+		if value == "" {
+			continue
+		}
+		if strings.HasPrefix(value, "postgres://") || strings.HasPrefix(value, "postgresql://") {
+			return "pgx", value
+		}
+	}
+	return "sqlite", defaultSQLitePath
 }
 
 func envDefault(key, fallback string) string {
@@ -318,6 +338,45 @@ func envDefault(key, fallback string) string {
 }
 
 func (app *App) loadUsers() error {
+	if app.db != nil {
+		rows, err := app.db.Query(`
+			SELECT username_key, username, salt, password_hash, created_at
+			FROM users
+			ORDER BY created_at ASC, username_key ASC
+		`)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+
+		next := make(map[string]UserRecord)
+		for rows.Next() {
+			var usernameKey string
+			var user UserRecord
+			if err := rows.Scan(
+				&usernameKey,
+				&user.Username,
+				&user.Salt,
+				&user.PasswordHash,
+				&user.CreatedAt,
+			); err != nil {
+				return err
+			}
+			if strings.TrimSpace(usernameKey) == "" {
+				continue
+			}
+			next[usernameKey] = user
+		}
+		if err := rows.Err(); err != nil {
+			return err
+		}
+
+		app.usersMu.Lock()
+		app.users = next
+		app.usersMu.Unlock()
+		return nil
+	}
+
 	raw, err := os.ReadFile(app.usersFile)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -348,10 +407,59 @@ func (app *App) loadUsers() error {
 func (app *App) saveUsers() error {
 	app.usersMu.RLock()
 	users := make([]UserRecord, 0, len(app.users))
-	for _, user := range app.users {
+	userKeys := make([]string, 0, len(app.users))
+	for key, user := range app.users {
 		users = append(users, user)
+		userKeys = append(userKeys, key)
 	}
 	app.usersMu.RUnlock()
+
+	if app.db != nil {
+		tx, err := app.db.Begin()
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if tx != nil {
+				_ = tx.Rollback()
+			}
+		}()
+
+		if _, err := tx.Exec(`DELETE FROM users`); err != nil {
+			return err
+		}
+		statement, err := tx.Prepare(`
+			INSERT INTO users (
+				username_key, username, salt, password_hash, created_at
+			) VALUES ($1, $2, $3, $4, $5)
+		`)
+		if err != nil {
+			return err
+		}
+		defer statement.Close()
+
+		sort.Strings(userKeys)
+		app.usersMu.RLock()
+		for _, key := range userKeys {
+			user := app.users[key]
+			if _, err := statement.Exec(
+				key,
+				user.Username,
+				user.Salt,
+				user.PasswordHash,
+				user.CreatedAt,
+			); err != nil {
+				app.usersMu.RUnlock()
+				return err
+			}
+		}
+		app.usersMu.RUnlock()
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+		tx = nil
+		return nil
+	}
 
 	sort.Slice(users, func(i, j int) bool {
 		return strings.ToLower(users[i].Username) < strings.ToLower(users[j].Username)
@@ -365,14 +473,32 @@ func (app *App) saveUsers() error {
 }
 
 func (app *App) initBookingsStore() error {
-	if err := os.MkdirAll(app.dataDir, 0755); err != nil {
-		return err
+	if app.dbDriver == "sqlite" {
+		if err := os.MkdirAll(app.dataDir, 0755); err != nil {
+			return err
+		}
 	}
-	db, err := sql.Open("sqlite", app.bookingsDBFile)
+	db, err := sql.Open(app.dbDriver, app.dbDSN)
 	if err != nil {
 		return err
 	}
 	db.SetMaxOpenConns(1)
+	if err := db.Ping(); err != nil {
+		db.Close()
+		return err
+	}
+	if _, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS users (
+			username_key TEXT PRIMARY KEY,
+			username TEXT NOT NULL,
+			salt TEXT NOT NULL,
+			password_hash TEXT NOT NULL,
+			created_at TEXT NOT NULL
+		)
+	`); err != nil {
+		db.Close()
+		return err
+	}
 	if _, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS bookings (
 			id TEXT PRIMARY KEY,
@@ -397,7 +523,55 @@ func (app *App) initBookingsStore() error {
 		return err
 	}
 	app.db = db
+	if err := app.migrateLegacyUsers(); err != nil {
+		return err
+	}
 	return app.migrateLegacyBookings()
+}
+
+func (app *App) migrateLegacyUsers() error {
+	if app.db == nil {
+		return nil
+	}
+	var existingCount int
+	if err := app.db.QueryRow(`SELECT COUNT(1) FROM users`).Scan(&existingCount); err != nil {
+		return err
+	}
+	if existingCount > 0 {
+		return app.loadUsers()
+	}
+
+	raw, err := os.ReadFile(app.usersFile)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+
+	var users []UserRecord
+	if err := json.Unmarshal(raw, &users); err != nil {
+		return err
+	}
+	next := make(map[string]UserRecord, len(users))
+	for _, user := range users {
+		key := strings.ToLower(strings.TrimSpace(user.Username))
+		if key == "" {
+			continue
+		}
+		next[key] = user
+	}
+	app.usersMu.Lock()
+	app.users = next
+	app.usersMu.Unlock()
+	if len(next) == 0 {
+		return nil
+	}
+	if err := app.saveUsers(); err != nil {
+		return err
+	}
+	_ = os.Rename(app.usersFile, app.usersFile+".migrated")
+	return app.loadUsers()
 }
 
 func (app *App) migrateLegacyBookings() error {
@@ -447,7 +621,7 @@ func (app *App) loadBookings() ([]BookingRecord, error) {
 			SELECT id, tour_id, link, title, city, region, price_per_person, nights, people,
 			       customer_name, phone, email, comment, username, status, created_at
 			FROM bookings
-			ORDER BY datetime(created_at) DESC, id DESC
+			ORDER BY created_at DESC, id DESC
 		`)
 		if err != nil {
 			return nil, err
@@ -518,7 +692,7 @@ func (app *App) saveBookings(bookings []BookingRecord) error {
 			INSERT INTO bookings (
 				id, tour_id, link, title, city, region, price_per_person, nights, people,
 				customer_name, phone, email, comment, username, status, created_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 		`)
 		if err != nil {
 			return err
@@ -627,17 +801,17 @@ func readToursFromFile(path string) ([]Tour, error) {
 		if tour.PricePerPerson > maxReasonablePricePerPerson {
 			continue
 		}
-		if !isRussiaCountry(tour.Country) {
-			continue
-		}
 		if len(tour.Categories) == 0 {
 			continue
 		}
 		if tour.Region == "" {
-			tour.Region = "Россия"
+			tour.Region = "Мир"
 		}
 		if tour.City == "" {
 			tour.City = tour.Region
+		}
+		if strings.TrimSpace(tour.Country) == "" {
+			tour.Country = "Мир"
 		}
 		if tour.MinNights <= 0 {
 			if tour.Days > 0 {
@@ -659,11 +833,6 @@ func readToursFromFile(path string) ([]Tour, error) {
 		return filtered[i].PricePerPerson < filtered[j].PricePerPerson
 	})
 	return filtered, nil
-}
-
-func isRussiaCountry(country string) bool {
-	safe := strings.ToLower(strings.TrimSpace(country))
-	return strings.Contains(safe, "рос") || strings.Contains(safe, "russia")
 }
 
 func fileModTime(path string) time.Time {
