@@ -264,6 +264,21 @@ def _is_russian_page_url(page_url: str) -> bool:
     return bool(path_parts)
 
 
+def _is_allowed_page_url(page_url: str) -> bool:
+    if _is_russian_page_url(page_url):
+        return True
+    if not getattr(settings, "PUTEVKA_INCLUDE_FOREIGN", False):
+        return False
+    parsed = urlparse(page_url)
+    if "putevka.com" not in parsed.netloc:
+        return False
+    path_parts = _split_page_parts(page_url)
+    if not path_parts:
+        return False
+    foreign_roots = set(getattr(settings, "PUTEVKA_FOREIGN_ROOTS", []) or FOREIGN_PAGE_ROOTS)
+    return path_parts[0] in foreign_roots
+
+
 def _find_product_nodes(json_data):
     stack = [json_data]
     while stack:
@@ -673,8 +688,8 @@ def _normalize_live_offer(
     )
     address = reviewed.get("address", {}) or {}
     country = _extract_country_from_address(address) or str(page_context.get("country", "")).strip()
-    if not country and not _is_russian_page_url(page_url):
-        return None
+    if not country:
+        country = ""
 
     page_city = str(page_context.get("city", "")).strip()
     page_region = str(page_context.get("region", "")).strip()
@@ -823,7 +838,7 @@ def _extract_reviews_from_html(html: str, page_url: str) -> list[dict]:
 
 
 def _fetch_live_page(page_url: str) -> list[dict]:
-    if not _is_russian_page_url(page_url):
+    if not _is_allowed_page_url(page_url):
         return []
 
     cache_ttl = max(30, int(getattr(settings, "PUTEVKA_PAGE_CACHE_TTL_SECONDS", 1800) or 1800))
@@ -916,7 +931,7 @@ def _load_sitemap_region_urls(limit: int) -> list[str]:
             continue
         if any(skip_token in loc for skip_token in ["/blog/", "/trip/", "/sights/", "/hotels/"]):
             continue
-        if not _is_russian_page_url(loc):
+        if not _is_allowed_page_url(loc):
             continue
         urls.append(loc)
 
@@ -932,7 +947,7 @@ def _extend_live_index_from_pages(page_urls: list[str], deduped_tours: dict, det
     for item in _fetch_live_pages(page_urls):
         deduped_tours[item["id"]] = item
         detail_link = str(item.get("link", "")).strip()
-        if detail_link and _is_russian_page_url(detail_link):
+        if detail_link and _is_allowed_page_url(detail_link):
             detail_urls.add(detail_link)
 
 
@@ -943,8 +958,19 @@ def _load_live_putevka(progress_callback=None) -> list[dict]:
     seed_urls = [
         url
         for url in list(getattr(settings, "PUTEVKA_REGION_URLS", []) or [])
-        if _is_russian_page_url(url)
+        if _is_allowed_page_url(url)
     ]
+    if getattr(settings, "PUTEVKA_INCLUDE_FOREIGN", False):
+        foreign_roots = list(getattr(settings, "PUTEVKA_FOREIGN_ROOTS", []) or []) or list(
+            FOREIGN_PAGE_ROOTS
+        )
+        seed_urls.extend(
+            [
+                f"https://www.putevka.com/{root}"
+                for root in foreign_roots
+                if str(root).strip()
+            ]
+        )
     if not seed_urls:
         raise RuntimeError("No live parser URLs configured")
 

@@ -3,11 +3,46 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Путевки по рассии</title>
+    <title>Путевки по россии</title>
     <link rel="stylesheet" href="/static/theme.css?v={{ static_version }}" />
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/static/app.js?v={{ static_version }}"></script>
+    <script>
+      (function () {
+        function showError(message) {
+          try {
+            var panel = document.getElementById("fatal-error-panel");
+            if (!panel) {
+              panel = document.createElement("div");
+              panel.id = "fatal-error-panel";
+              panel.style.position = "fixed";
+              panel.style.left = "16px";
+              panel.style.right = "16px";
+              panel.style.bottom = "16px";
+              panel.style.zIndex = "9999";
+              panel.style.padding = "12px 14px";
+              panel.style.borderRadius = "12px";
+              panel.style.background = "rgba(160, 30, 30, 0.9)";
+              panel.style.color = "#fff";
+              panel.style.font = "14px/1.4 system-ui, -apple-system, Segoe UI, sans-serif";
+              panel.style.boxShadow = "0 10px 26px rgba(0,0,0,0.4)";
+              document.body.appendChild(panel);
+            }
+            panel.textContent = message;
+          } catch (err) {
+            console.error(err);
+          }
+        }
+        window.addEventListener("error", function (event) {
+          var msg = event && event.message ? event.message : "Unknown error";
+          showError("Ошибка фронта: " + msg);
+        });
+      })();
+    </script>
+    <script src="/static/vendor/react.production.min.js?v={{ static_version }}"></script>
+    <script src="/static/vendor/react-dom.production.min.js?v={{ static_version }}"></script>
+    <script src="/static/vendor/htm.umd.js?v={{ static_version }}"></script>
+    <script src="/static/app.js?v={{ static_version }}"></script>
   </body>
 </html>

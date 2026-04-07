@@ -4,8 +4,8 @@
   "private": true,
   "description": "Putevka: frontend + Go backend",
   "scripts": {
-    "dev": "cd go_backend && \"C:\\Program Files\\Go\\bin\\go.exe\" build -o putevka-go.exe . && .\\putevka-go.exe",
-    "start": "cd go_backend && \"C:\\Program Files\\Go\\bin\\go.exe\" build -o putevka-go.exe . && .\\putevka-go.exe",
+    "dev": "powershell -NoProfile -Command \"$env:GO_BACKEND_PORT='8080'; cd go_backend; & 'C:\\\\Program Files\\\\Go\\\\bin\\\\go.exe' build -o putevka-go.exe .; Start-Process 'http://127.0.0.1:8080'; .\\\\putevka-go.exe\"",
+    "start": "powershell -NoProfile -Command \"$env:GO_BACKEND_PORT='8080'; cd go_backend; & 'C:\\\\Program Files\\\\Go\\\\bin\\\\go.exe' build -o putevka-go.exe .; Start-Process 'http://127.0.0.1:8080'; .\\\\putevka-go.exe\"",
     "django:dev": ".venv\\Scripts\\python.exe django_backend\\manage.py runserver 8000",
     "django:start": ".venv\\Scripts\\python.exe django_backend\\manage.py runserver 8000",
     "go:dev": "cd go_backend && \"C:\\Program Files\\Go\\bin\\go.exe\" build -o putevka-go.exe . && .\\putevka-go.exe",

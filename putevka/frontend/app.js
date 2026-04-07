@@ -1,14 +1,12 @@
-import React, {
+﻿const {
   startTransition,
   useDeferredValue,
   useEffect,
   useMemo,
   useRef,
   useState,
-} from "https://esm.sh/react@18.2.0";
-import { createRoot } from "https://esm.sh/react-dom@18.2.0/client";
-import htm from "https://esm.sh/htm@3.1.1";
-
+} = React;
+const { createRoot } = ReactDOM;
 const html = htm.bind(React.createElement);
 const PAGE_SIZE = 12;
 const NIGHT_OPTIONS = [3, 5, 7, 10, 14];
@@ -61,7 +59,7 @@ const CATEGORY_COPY = {
     eu: { label: "All inclusive", description: "Meals and part of activities included" },
   },
 };
-const TRANSLIT_MAP = {
+/* const TRANSLIT_MAP = {
   А: "A", а: "a", Б: "B", б: "b", В: "V", в: "v", Г: "G", г: "g",
   Д: "D", д: "d", Е: "E", е: "e", Ё: "Yo", ё: "yo", Ж: "Zh", ж: "zh",
   З: "Z", з: "z", И: "I", и: "i", Й: "Y", й: "y", К: "K", к: "k",
@@ -71,6 +69,20 @@ const TRANSLIT_MAP = {
   Ч: "Ch", ч: "ch", Ш: "Sh", ш: "sh", Щ: "Sch", щ: "sch", Ъ: "", ъ: "",
   Ы: "Y", ы: "y", Ь: "", ь: "", Э: "E", э: "e", Ю: "Yu", ю: "yu",
   Я: "Ya", я: "ya",
+};
+*/
+const TRANSLIT_MAP = {
+  "\u0410": "A", "\u0430": "a", "\u0411": "B", "\u0431": "b", "\u0412": "V", "\u0432": "v",
+  "\u0413": "G", "\u0433": "g", "\u0414": "D", "\u0434": "d", "\u0415": "E", "\u0435": "e",
+  "\u0401": "Yo", "\u0451": "yo", "\u0416": "Zh", "\u0436": "zh", "\u0417": "Z", "\u0437": "z",
+  "\u0418": "I", "\u0438": "i", "\u0419": "Y", "\u0439": "y", "\u041a": "K", "\u043a": "k",
+  "\u041b": "L", "\u043b": "l", "\u041c": "M", "\u043c": "m", "\u041d": "N", "\u043d": "n",
+  "\u041e": "O", "\u043e": "o", "\u041f": "P", "\u043f": "p", "\u0420": "R", "\u0440": "r",
+  "\u0421": "S", "\u0441": "s", "\u0422": "T", "\u0442": "t", "\u0423": "U", "\u0443": "u",
+  "\u0424": "F", "\u0444": "f", "\u0425": "Kh", "\u0445": "kh", "\u0426": "Ts", "\u0446": "ts",
+  "\u0427": "Ch", "\u0447": "ch", "\u0428": "Sh", "\u0448": "sh", "\u0429": "Sch", "\u0449": "sch",
+  "\u042a": "", "\u044a": "", "\u042b": "Y", "\u044b": "y", "\u042c": "", "\u044c": "",
+  "\u042d": "E", "\u044d": "e", "\u042e": "Yu", "\u044e": "yu", "\u042f": "Ya", "\u044f": "ya",
 };
 const COPY = {
   ru: {
@@ -98,6 +110,12 @@ const COPY = {
     peopleLabel: "людей",
     sortLabel: "сортировка",
     anyPrice: "любая",
+    visaLabelTitle: "виза",
+    anyVisa: "любая",
+    visaFree: "без визы",
+    visaRequired: "нужна",
+    visaUnknown: "уточнить",
+    visaLabel: (value) => ({ not_required: "виза не нужна", required: "нужна виза", unknown: "виза: уточнить" }[value] || value),
     searchPlaceholder: "море, spa, горы",
     cityPlaceholder: "Сочи, Саки, Белокуриха",
     searchAction: "искать",
@@ -205,6 +223,12 @@ const COPY = {
     peopleLabel: "people",
     sortLabel: "sorting",
     anyPrice: "any",
+    visaLabelTitle: "visa",
+    anyVisa: "any",
+    visaFree: "no visa",
+    visaRequired: "visa required",
+    visaUnknown: "check",
+    visaLabel: (value) => ({ not_required: "No visa needed", required: "Visa required", unknown: "Visa: check" }[value] || value),
     searchPlaceholder: "sea, spa, mountains",
     cityPlaceholder: "Sochi, Saki, Belokurikha",
     searchAction: "search",
@@ -361,6 +385,18 @@ function formatMinNights(value, localeMode) {
     : `from ${nights} ${formatNightWord(nights, localeMode)}`;
 }
 
+function formatVisaLabel(tour, localeMode) {
+  const status = String(tour?.visaStatus || "").trim();
+  if (!status) return "";
+  if (status === "not_required") {
+    return localeMode === "ru" ? "виза не нужна" : "No visa needed";
+  }
+  if (status === "required") {
+    return localeMode === "ru" ? "нужна виза" : "Visa required";
+  }
+  return localeMode === "ru" ? "виза: уточнить" : "Visa: check";
+}
+
 function formatReviewDate(value, localeCode) {
   const safe = String(value || "").trim();
   if (!safe) return "";
@@ -372,8 +408,12 @@ function formatReviewDate(value, localeCode) {
 function placeLabelFromTour(tour) {
   const city = String(tour?.city || "").trim();
   const region = String(tour?.region || "").trim();
-  if (city && region && city !== region) return `${city}, ${region}`;
-  return city || region || "Россия";
+  const country = String(tour?.country || "").trim();
+  const base = city && region && city !== region ? `${city}, ${region}` : (city || region || "");
+  if (country && !["Россия", "Мир", "Russia", "World"].includes(country)) {
+    return base ? `${base}, ${country}` : country;
+  }
+  return base || "Мир";
 }
 
 function hashPhotoSeed(value) {
@@ -439,7 +479,7 @@ function App() {
   const [quickCities, setQuickCities] = useState([]);
   const [citySuggestions, setCitySuggestions] = useState([]);
   const [searchSuggestions, setSearchSuggestions] = useState([]);
-  const [filters, setFilters] = useState({ query: "", city: "", price: "", sort: "price_asc", categories: [] });
+  const [filters, setFilters] = useState({ query: "", city: "", price: "", visa: "", sort: "price_asc", categories: [] });
   const [searchInput, setSearchInput] = useState("");
   const [cityInput, setCityInput] = useState("");
   const [planner, setPlanner] = useState({ nights: 7, people: 2 });
@@ -527,6 +567,7 @@ function App() {
     ...(filters.city ? [{ key: "city", label: displayText(filters.city), onClick: () => applyCity("") }] : []),
     ...(filters.query ? [{ key: "query", label: filters.query, onClick: clearQuery }] : []),
     ...(filters.price ? [{ key: "price", label: formatPrice(filters.price), onClick: clearPrice }] : []),
+    ...(filters.visa ? [{ key: "visa", label: copy.visaLabel(filters.visa), onClick: () => setFilters((prev) => ({ ...prev, visa: "" })) }] : []),
     ...filters.categories.map((id) => ({ key: id, label: categoryMap.get(id) || id, onClick: () => toggleCategory(id) })),
   ];
 
@@ -678,6 +719,7 @@ function App() {
     if (filters.query) params.set("q", filters.query);
     if (filters.city) params.set("city", filters.city);
     if (filters.price) params.set("pricePerPerson", filters.price);
+    if (filters.visa) params.set("visa", filters.visa);
     params.set("sort", filters.sort);
     for (const categoryId of filters.categories) params.append("category", categoryId);
     return params;
@@ -687,6 +729,7 @@ function App() {
     const params = new URLSearchParams();
     if (filters.query) params.set("tourQuery", filters.query);
     if (filters.price) params.set("pricePerPerson", filters.price);
+    if (filters.visa) params.set("visa", filters.visa);
     for (const categoryId of filters.categories) params.append("category", categoryId);
     if (prefix) params.set("prefix", prefix);
     params.set("limit", String(limit));
@@ -697,6 +740,7 @@ function App() {
     const params = new URLSearchParams();
     if (filters.city) params.set("city", filters.city);
     if (filters.price) params.set("pricePerPerson", filters.price);
+    if (filters.visa) params.set("visa", filters.visa);
     for (const categoryId of filters.categories) params.append("category", categoryId);
     params.set("prefix", prefix);
     params.set("limit", String(limit));
@@ -789,10 +833,11 @@ function App() {
 
   const clearQuery = () => { setFilters((prev) => ({ ...prev, query: "" })); setSearchInput(""); setCurrentPage(1); };
   const clearPrice = () => { setFilters((prev) => ({ ...prev, price: "" })); setCurrentPage(1); };
+  const clearVisa = () => { setFilters((prev) => ({ ...prev, visa: "" })); setCurrentPage(1); };
   const applyCity = (city) => { const normalized = String(city || "").trim(); setFilters((prev) => ({ ...prev, city: normalized })); setCityInput(normalized); setCurrentPage(1); };
   const applyRegion = (region) => { const normalized = String(region || "").trim(); setFilters((prev) => ({ ...prev, query: normalized, city: "" })); setSearchInput(normalized); setCityInput(""); setCurrentPage(1); };
   const applySearchSuggestion = (query) => { const normalized = String(query || "").trim(); setFilters((prev) => ({ ...prev, query: normalized })); setSearchInput(normalized); setCurrentPage(1); };
-  const resetFilters = () => { setFilters({ query: "", city: "", price: "", sort: "price_asc", categories: [] }); setSearchInput(""); setCityInput(""); setCurrentPage(1); };
+  const resetFilters = () => { setFilters({ query: "", city: "", price: "", visa: "", sort: "price_asc", categories: [] }); setSearchInput(""); setCityInput(""); setCurrentPage(1); };
   const toggleCategory = (categoryId) => { setFilters((prev) => ({ ...prev, categories: prev.categories.includes(categoryId) ? prev.categories.filter((item) => item !== categoryId) : [...prev.categories, categoryId] })); setCurrentPage(1); };
   const openTourLink = (url) => { const normalized = String(url || "").trim(); if (normalized && normalized !== "#") window.open(normalized, "_blank", "noopener,noreferrer"); };
   const closeDetail = () => {
@@ -1027,6 +1072,7 @@ function App() {
             <label className="search-field search-field--query"><span>${copy.searchLabel}</span><input className="search-control" value=${searchInput} onInput=${(event) => setSearchInput(event.target.value)} placeholder=${copy.searchPlaceholder} /></label>
             <label className="search-field"><span>${copy.cityLabel}</span><input className="search-control" value=${cityInput} onInput=${(event) => setCityInput(event.target.value)} placeholder=${copy.cityPlaceholder} /></label>
             <label className="search-field"><span>${copy.priceLabel}</span><select className="search-control" value=${filters.price} onChange=${(event) => { setFilters((prev) => ({ ...prev, price: event.target.value })); setCurrentPage(1); }}><option value="">${copy.anyPrice}</option>${priceOptions.map((price) => html`<option key=${String(price)} value=${String(price)}>${formatPrice(price)}</option>`)}</select></label>
+            <label className="search-field"><span>${copy.visaLabelTitle}</span><select className="search-control" value=${filters.visa} onChange=${(event) => { setFilters((prev) => ({ ...prev, visa: event.target.value })); setCurrentPage(1); }}><option value="">${copy.anyVisa}</option><option value="not_required">${copy.visaFree}</option><option value="required">${copy.visaRequired}</option><option value="unknown">${copy.visaUnknown}</option></select></label>
             <label className="search-field search-field--small"><span>${copy.nightsLabel}</span><select className="search-control" value=${String(planner.nights)} onChange=${(event) => setPlanner((prev) => ({ ...prev, nights: Number(event.target.value) }))}>${NIGHT_OPTIONS.map((nights) => html`<option key=${String(nights)} value=${String(nights)}>${nights}</option>`)}</select></label>
             <label className="search-field search-field--small"><span>${copy.peopleLabel}</span><select className="search-control" value=${String(planner.people)} onChange=${(event) => setPlanner((prev) => ({ ...prev, people: Number(event.target.value) }))}>${PEOPLE_OPTIONS.map((people) => html`<option key=${String(people)} value=${String(people)}>${people}</option>`)}</select></label>
             <label className="search-field"><span>${copy.sortLabel}</span><select className="search-control" value=${filters.sort} onChange=${(event) => { setFilters((prev) => ({ ...prev, sort: event.target.value })); setCurrentPage(1); }}>${sortOptions.map((option) => html`<option key=${option.value} value=${option.value}>${option.label}</option>`)}</select></label>
@@ -1103,6 +1149,7 @@ function App() {
                       </div>
                       <h3>${tour.title}</h3>
                       <div className="offer-card__chips">${(tour.categories || []).slice(0, 4).map((categoryId) => html`<span key=${`${tour.id}_${categoryId}`} className="soft-mark">${categoryMap.get(categoryId) || categoryId}</span>`)}</div>
+                      ${tour.visaStatus ? html`<div className=${`offer-card__visa offer-card__visa--${tour.visaStatus}`}>${formatVisaLabel(tour, localeMode)}</div>` : null}
                       <div className="offer-card__review-bar">
                         <button className="offer-card__reviews-button" type="button" onClick=${(event) => openReviews(event, tour)}>${copy.reviewButton}</button>
                         ${(tour.ratingValue || tour.reviewCount) ? html`<span className="offer-card__reviews-meta">${tour.ratingValue ? `★ ${Number(tour.ratingValue).toFixed(1)}` : ""}${tour.reviewCount ? `${tour.ratingValue ? " · " : ""}${copy.reviewCount(tour.reviewCount)}` : ""}</span>` : null}
@@ -1165,7 +1212,9 @@ function App() {
                         <span>${planner.people} ${localeMode === "ru" ? "чел." : "guests"}</span>
                         <strong>${formatMoney((Number(detailModalTour.pricePerPerson || detailData?.prices?.[0]?.price || 0) * Math.max(planner.people, 1)) || 0)}</strong>
                       </div>
+                      ${detailModalTour?.visaStatus ? html`<div className=${`detail-visa detail-visa--${detailModalTour.visaStatus}`}>${formatVisaLabel(detailModalTour, localeMode)}</div>` : null}
                       <form className="auth-form detail-booking-form" onSubmit=${submitBooking}>
+                      ${detailModalTour?.visaNote ? html`<div className="detail-visa__note">${detailModalTour.visaNote}</div>` : null}
                         <label className="auth-form__field"><span>${localeMode === "ru" ? "Имя" : "Name"}</span><input value=${bookingForm.customerName} onInput=${(event) => setBookingForm((prev) => ({ ...prev, customerName: event.target.value }))} placeholder=${localeMode === "ru" ? "Как к вам обращаться" : "Your name"} /></label>
                         <label className="auth-form__field"><span>${localeMode === "ru" ? "Телефон" : "Phone"}</span><input value=${bookingForm.phone} onInput=${(event) => setBookingForm((prev) => ({ ...prev, phone: event.target.value }))} placeholder=${localeMode === "ru" ? "+7..." : "+7..."} /></label>
                         <label className="auth-form__field"><span>Email</span><input value=${bookingForm.email} onInput=${(event) => setBookingForm((prev) => ({ ...prev, email: event.target.value }))} placeholder="mail@example.com" /></label>
@@ -1248,3 +1297,8 @@ function App() {
 }
 
 createRoot(document.getElementById("root")).render(html`<${App} />`);
+
+
+
+
+

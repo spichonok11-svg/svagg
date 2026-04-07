@@ -205,5 +205,33 @@ PUTEVKA_REGION_URLS = [
     ).split(",")
     if url.strip()
 ]
+PUTEVKA_INCLUDE_FOREIGN = os.getenv("PUTEVKA_INCLUDE_FOREIGN", "1") == "1"
+PUTEVKA_FOREIGN_ROOTS = [
+    root.strip()
+    for root in os.getenv(
+        "PUTEVKA_FOREIGN_ROOTS",
+        ",".join(
+            [
+                "abkhazia",
+                "belarus",
+                "chehija",
+                "italiya",
+                "turtsiya",
+                "oae",
+                "egipet",
+                "tailand",
+                "vietnam",
+                "gruziya",
+                "azerbaydzhan",
+                "armeniya",
+                "kazahstan",
+                "kyrgyzstan",
+                "serbiya",
+                "chernogoriya",
+            ]
+        ),
+    ).split(",")
+    if root.strip()
+]
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

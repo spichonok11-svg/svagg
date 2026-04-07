@@ -43,6 +43,8 @@ type Tour struct {
 	City           string   `json:"city,omitempty"`
 	Region         string   `json:"region"`
 	Country        string   `json:"country"`
+	VisaStatus     string   `json:"visaStatus,omitempty"`
+	VisaNote       string   `json:"visaNote,omitempty"`
 	PricePerPerson int      `json:"pricePerPerson"`
 	Days           int      `json:"days"`
 	MinNights      int      `json:"minNights,omitempty"`
@@ -186,6 +188,7 @@ type App struct {
 	workerFile      string
 	dbDriver        string
 	dbDSN           string
+	toursTableReady bool
 
 	mu                     sync.RWMutex
 	tours                  []Tour
@@ -196,6 +199,7 @@ type App struct {
 	snapshotModTime        time.Time
 	partialSnapshotModTime time.Time
 	cacheGeneration        uint64
+	lastToursDBSave        time.Time
 
 	queryMu          sync.RWMutex
 	queryCache       map[string][]int
@@ -241,11 +245,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err := app.loadUsers(); err != nil {
-		log.Printf("users load failed: %v", err)
-	}
 	if err := app.initBookingsStore(); err != nil {
 		log.Printf("bookings store init failed: %v", err)
+	}
+	if err := app.loadUsers(); err != nil {
+		log.Printf("users load failed: %v", err)
 	}
 	if app.db != nil {
 		defer app.db.Close()
@@ -289,7 +293,10 @@ func newApp() (*App, error) {
 		secret = "putevka-go-session-secret-change-me"
 	}
 
-	dbDriver, dbDSN := resolveDatabaseConfig(filepath.Join(rootDir, "data", "bookings.db"))
+	dbDriver, dbDSN, err := resolveDatabaseConfig()
+	if err != nil {
+		return nil, err
+	}
 
 	return &App{
 		rootDir:         rootDir,
@@ -316,17 +323,18 @@ func newApp() (*App, error) {
 	}, nil
 }
 
-func resolveDatabaseConfig(defaultSQLitePath string) (string, string) {
+func resolveDatabaseConfig() (string, string, error) {
 	for _, key := range []string{"GO_BACKEND_DATABASE_URL", "DATABASE_URL", "POSTGRES_DSN"} {
 		value := strings.TrimSpace(os.Getenv(key))
 		if value == "" {
 			continue
 		}
 		if strings.HasPrefix(value, "postgres://") || strings.HasPrefix(value, "postgresql://") {
-			return "pgx", value
+			return "pgx", value, nil
 		}
 	}
-	return "sqlite", defaultSQLitePath
+	defaultSQLitePath := filepath.Join("..", "data", "bookings.db")
+	return "sqlite", defaultSQLitePath, nil
 }
 
 func envDefault(key, fallback string) string {
@@ -338,64 +346,39 @@ func envDefault(key, fallback string) string {
 }
 
 func (app *App) loadUsers() error {
-	if app.db != nil {
-		rows, err := app.db.Query(`
-			SELECT username_key, username, salt, password_hash, created_at
-			FROM users
-			ORDER BY created_at ASC, username_key ASC
-		`)
-		if err != nil {
-			return err
-		}
-		defer rows.Close()
-
-		next := make(map[string]UserRecord)
-		for rows.Next() {
-			var usernameKey string
-			var user UserRecord
-			if err := rows.Scan(
-				&usernameKey,
-				&user.Username,
-				&user.Salt,
-				&user.PasswordHash,
-				&user.CreatedAt,
-			); err != nil {
-				return err
-			}
-			if strings.TrimSpace(usernameKey) == "" {
-				continue
-			}
-			next[usernameKey] = user
-		}
-		if err := rows.Err(); err != nil {
-			return err
-		}
-
-		app.usersMu.Lock()
-		app.users = next
-		app.usersMu.Unlock()
-		return nil
+	if app.db == nil {
+		return errors.New("database is required")
 	}
-
-	raw, err := os.ReadFile(app.usersFile)
+	rows, err := app.db.Query(`
+		SELECT username_key, username, salt, password_hash, created_at
+		FROM users
+		ORDER BY created_at ASC, username_key ASC
+	`)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
+		return err
+	}
+	defer rows.Close()
+
+	next := make(map[string]UserRecord)
+	for rows.Next() {
+		var usernameKey string
+		var user UserRecord
+		if err := rows.Scan(
+			&usernameKey,
+			&user.Username,
+			&user.Salt,
+			&user.PasswordHash,
+			&user.CreatedAt,
+		); err != nil {
+			return err
 		}
-		return err
-	}
-
-	var users []UserRecord
-	if err := json.Unmarshal(raw, &users); err != nil {
-		return err
-	}
-
-	next := make(map[string]UserRecord, len(users))
-	for _, user := range users {
-		if strings.TrimSpace(user.Username) == "" {
+		if strings.TrimSpace(usernameKey) == "" {
 			continue
 		}
-		next[strings.ToLower(user.Username)] = user
+		next[usernameKey] = user
+	}
+	if err := rows.Err(); err != nil {
+		return err
 	}
 
 	app.usersMu.Lock()
@@ -414,62 +397,55 @@ func (app *App) saveUsers() error {
 	}
 	app.usersMu.RUnlock()
 
-	if app.db != nil {
-		tx, err := app.db.Begin()
-		if err != nil {
-			return err
-		}
-		defer func() {
-			if tx != nil {
-				_ = tx.Rollback()
-			}
-		}()
-
-		if _, err := tx.Exec(`DELETE FROM users`); err != nil {
-			return err
-		}
-		statement, err := tx.Prepare(`
-			INSERT INTO users (
-				username_key, username, salt, password_hash, created_at
-			) VALUES ($1, $2, $3, $4, $5)
-		`)
-		if err != nil {
-			return err
-		}
-		defer statement.Close()
-
-		sort.Strings(userKeys)
-		app.usersMu.RLock()
-		for _, key := range userKeys {
-			user := app.users[key]
-			if _, err := statement.Exec(
-				key,
-				user.Username,
-				user.Salt,
-				user.PasswordHash,
-				user.CreatedAt,
-			); err != nil {
-				app.usersMu.RUnlock()
-				return err
-			}
-		}
-		app.usersMu.RUnlock()
-		if err := tx.Commit(); err != nil {
-			return err
-		}
-		tx = nil
-		return nil
+	if app.db == nil {
+		return errors.New("database is required")
 	}
-
-	sort.Slice(users, func(i, j int) bool {
-		return strings.ToLower(users[i].Username) < strings.ToLower(users[j].Username)
-	})
-
-	body, err := json.MarshalIndent(users, "", "  ")
+	tx, err := app.db.Begin()
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(app.usersFile, body, 0644)
+	defer func() {
+		if tx != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	statement, err := tx.Prepare(`
+		INSERT INTO users (
+			username_key, username, salt, password_hash, created_at
+		) VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT(username_key) DO UPDATE SET
+			username=excluded.username,
+			salt=excluded.salt,
+			password_hash=excluded.password_hash,
+			created_at=excluded.created_at
+	`)
+	if err != nil {
+		return err
+	}
+	defer statement.Close()
+
+	sort.Strings(userKeys)
+	app.usersMu.RLock()
+	for _, key := range userKeys {
+		user := app.users[key]
+		if _, err := statement.Exec(
+			key,
+			user.Username,
+			user.Salt,
+			user.PasswordHash,
+			user.CreatedAt,
+		); err != nil {
+			app.usersMu.RUnlock()
+			return err
+		}
+	}
+	app.usersMu.RUnlock()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	tx = nil
+	return nil
 }
 
 func (app *App) initBookingsStore() error {
@@ -522,7 +498,37 @@ func (app *App) initBookingsStore() error {
 		db.Close()
 		return err
 	}
+	if _, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS tours (
+			id TEXT PRIMARY KEY,
+			source TEXT NOT NULL,
+			title TEXT NOT NULL,
+			city TEXT NOT NULL DEFAULT '',
+			region TEXT NOT NULL DEFAULT '',
+			country TEXT NOT NULL DEFAULT '',
+			visa_status TEXT NOT NULL DEFAULT '',
+			visa_note TEXT NOT NULL DEFAULT '',
+			price_per_person INTEGER NOT NULL DEFAULT 0,
+			days INTEGER NOT NULL DEFAULT 0,
+			min_nights INTEGER NOT NULL DEFAULT 0,
+			categories_json TEXT NOT NULL DEFAULT '[]',
+			has_hotel BOOLEAN NOT NULL DEFAULT FALSE,
+			has_pool BOOLEAN NOT NULL DEFAULT FALSE,
+			description TEXT NOT NULL DEFAULT '',
+			review_text TEXT NOT NULL DEFAULT '',
+			review_author TEXT NOT NULL DEFAULT '',
+			rating_value REAL NOT NULL DEFAULT 0,
+			review_count INTEGER NOT NULL DEFAULT 0,
+			image TEXT NOT NULL DEFAULT '',
+			link TEXT NOT NULL DEFAULT '',
+			updated_at TEXT NOT NULL
+		)
+	`); err != nil {
+		db.Close()
+		return err
+	}
 	app.db = db
+	app.toursTableReady = true
 	if err := app.migrateLegacyUsers(); err != nil {
 		return err
 	}
@@ -616,123 +622,119 @@ func (app *App) loadLegacyBookingsFile() ([]BookingRecord, error) {
 }
 
 func (app *App) loadBookings() ([]BookingRecord, error) {
-	if app.db != nil {
-		rows, err := app.db.Query(`
-			SELECT id, tour_id, link, title, city, region, price_per_person, nights, people,
-			       customer_name, phone, email, comment, username, status, created_at
-			FROM bookings
-			ORDER BY created_at DESC, id DESC
-		`)
-		if err != nil {
-			return nil, err
-		}
-		defer rows.Close()
-
-		bookings := []BookingRecord{}
-		for rows.Next() {
-			var record BookingRecord
-			if err := rows.Scan(
-				&record.ID,
-				&record.TourID,
-				&record.Link,
-				&record.Title,
-				&record.City,
-				&record.Region,
-				&record.PricePerPerson,
-				&record.Nights,
-				&record.People,
-				&record.CustomerName,
-				&record.Phone,
-				&record.Email,
-				&record.Comment,
-				&record.Username,
-				&record.Status,
-				&record.CreatedAt,
-			); err != nil {
-				return nil, err
-			}
-			bookings = append(bookings, record)
-		}
-		if err := rows.Err(); err != nil {
-			return nil, err
-		}
-		return bookings, nil
+	if app.db == nil {
+		return nil, errors.New("database is required")
 	}
-
-	raw, err := os.ReadFile(app.bookingsFile)
+	rows, err := app.db.Query(`
+		SELECT id, tour_id, link, title, city, region, price_per_person, nights, people,
+		       customer_name, phone, email, comment, username, status, created_at
+		FROM bookings
+		ORDER BY created_at DESC, id DESC
+	`)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return []BookingRecord{}, nil
-		}
 		return nil, err
 	}
-	var bookings []BookingRecord
-	if err := json.Unmarshal(raw, &bookings); err != nil {
+	defer rows.Close()
+
+	bookings := []BookingRecord{}
+	for rows.Next() {
+		var record BookingRecord
+		if err := rows.Scan(
+			&record.ID,
+			&record.TourID,
+			&record.Link,
+			&record.Title,
+			&record.City,
+			&record.Region,
+			&record.PricePerPerson,
+			&record.Nights,
+			&record.People,
+			&record.CustomerName,
+			&record.Phone,
+			&record.Email,
+			&record.Comment,
+			&record.Username,
+			&record.Status,
+			&record.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		bookings = append(bookings, record)
+	}
+	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return bookings, nil
 }
 
 func (app *App) saveBookings(bookings []BookingRecord) error {
-	if app.db != nil {
-		tx, err := app.db.Begin()
-		if err != nil {
-			return err
-		}
-		defer func() {
-			if tx != nil {
-				_ = tx.Rollback()
-			}
-		}()
-
-		if _, err := tx.Exec(`DELETE FROM bookings`); err != nil {
-			return err
-		}
-		statement, err := tx.Prepare(`
-			INSERT INTO bookings (
-				id, tour_id, link, title, city, region, price_per_person, nights, people,
-				customer_name, phone, email, comment, username, status, created_at
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-		`)
-		if err != nil {
-			return err
-		}
-		defer statement.Close()
-
-		for _, record := range bookings {
-			if _, err := statement.Exec(
-				record.ID,
-				record.TourID,
-				record.Link,
-				record.Title,
-				record.City,
-				record.Region,
-				record.PricePerPerson,
-				record.Nights,
-				record.People,
-				record.CustomerName,
-				record.Phone,
-				record.Email,
-				record.Comment,
-				record.Username,
-				record.Status,
-				record.CreatedAt,
-			); err != nil {
-				return err
-			}
-		}
-		if err := tx.Commit(); err != nil {
-			return err
-		}
-		tx = nil
-		return nil
+	if app.db == nil {
+		return errors.New("database is required")
 	}
-
-	body, err := json.MarshalIndent(bookings, "", "  ")
+	tx, err := app.db.Begin()
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(app.bookingsFile, body, 0644)
+	defer func() {
+		if tx != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	statement, err := tx.Prepare(`
+		INSERT INTO bookings (
+			id, tour_id, link, title, city, region, price_per_person, nights, people,
+			customer_name, phone, email, comment, username, status, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		ON CONFLICT(id) DO UPDATE SET
+			tour_id=excluded.tour_id,
+			link=excluded.link,
+			title=excluded.title,
+			city=excluded.city,
+			region=excluded.region,
+			price_per_person=excluded.price_per_person,
+			nights=excluded.nights,
+			people=excluded.people,
+			customer_name=excluded.customer_name,
+			phone=excluded.phone,
+			email=excluded.email,
+			comment=excluded.comment,
+			username=excluded.username,
+			status=excluded.status,
+			created_at=excluded.created_at
+	`)
+	if err != nil {
+		return err
+	}
+	defer statement.Close()
+
+	for _, record := range bookings {
+		if _, err := statement.Exec(
+			record.ID,
+			record.TourID,
+			record.Link,
+			record.Title,
+			record.City,
+			record.Region,
+			record.PricePerPerson,
+			record.Nights,
+			record.People,
+			record.CustomerName,
+			record.Phone,
+			record.Email,
+			record.Comment,
+			record.Username,
+			record.Status,
+			record.CreatedAt,
+		); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	tx = nil
+	return nil
 }
 
 func (app *App) loadTours() error {
@@ -774,6 +776,7 @@ func (app *App) loadTours() error {
 		app.queryMu.Lock()
 		clear(app.queryCache)
 		app.queryMu.Unlock()
+		app.queueToursDBSave(tours, false)
 		return nil
 	}
 	if lastErr == nil {
@@ -813,6 +816,7 @@ func readToursFromFile(path string) ([]Tour, error) {
 		if strings.TrimSpace(tour.Country) == "" {
 			tour.Country = "Мир"
 		}
+		applyVisaInfo(&tour)
 		if tour.MinNights <= 0 {
 			if tour.Days > 0 {
 				tour.MinNights = tour.Days
@@ -841,6 +845,184 @@ func fileModTime(path string) time.Time {
 		return time.Time{}
 	}
 	return info.ModTime().UTC()
+}
+
+func applyVisaInfo(tour *Tour) {
+	if tour == nil {
+		return
+	}
+	country := strings.ToLower(strings.TrimSpace(tour.Country))
+	if country == "" || country == "мир" || country == "world" {
+		tour.VisaStatus = "unknown"
+		tour.VisaNote = "Уточните визовый режим."
+		return
+	}
+	visaFree := map[string]struct{}{
+		"россия":               {},
+		"russia":               {},
+		"абхазия":              {},
+		"abkhazia":             {},
+		"беларусь":             {},
+		"belarus":              {},
+		"казахстан":            {},
+		"kazakhstan":           {},
+		"армения":              {},
+		"armenia":              {},
+		"кыргызстан":           {},
+		"kyrgyzstan":           {},
+		"киргизия":             {},
+		"азербайджан":          {},
+		"azerbaijan":           {},
+		"таджикистан":          {},
+		"tajikistan":           {},
+		"узбекистан":           {},
+		"uzbekistan":           {},
+		"грузия":               {},
+		"georgia":              {},
+		"сербия":               {},
+		"serbia":               {},
+		"черногория":           {},
+		"montenegro":           {},
+		"турция":               {},
+		"turkey":               {},
+		"таиланд":              {},
+		"thailand":             {},
+		"вьетнам":              {},
+		"vietnam":              {},
+		"оаэ":                  {},
+		"uae":                  {},
+		"united arab emirates": {},
+		"малдивы":              {},
+		"maldives":             {},
+		"египет":               {},
+		"egypt":                {},
+	}
+	if _, ok := visaFree[country]; ok {
+		tour.VisaStatus = "not_required"
+		tour.VisaNote = "Виза обычно не требуется."
+		return
+	}
+	tour.VisaStatus = "required"
+	tour.VisaNote = "Виза может потребоваться, уточните правила."
+}
+
+func (app *App) saveToursToDatabase(tours []Tour) error {
+	if app.db == nil || !app.toursTableReady {
+		return nil
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	tx, err := app.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if tx != nil {
+			_ = tx.Rollback()
+		}
+	}()
+	stmt, err := tx.Prepare(`
+		INSERT INTO tours (
+			id, source, title, city, region, country, visa_status, visa_note,
+			price_per_person, days, min_nights, categories_json, has_hotel, has_pool,
+			description, review_text, review_author, rating_value, review_count,
+			image, link, updated_at
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8,
+			$9, $10, $11, $12, $13, $14,
+			$15, $16, $17, $18, $19,
+			$20, $21, $22
+		)
+		ON CONFLICT(id) DO UPDATE SET
+			source=excluded.source,
+			title=excluded.title,
+			city=excluded.city,
+			region=excluded.region,
+			country=excluded.country,
+			visa_status=excluded.visa_status,
+			visa_note=excluded.visa_note,
+			price_per_person=excluded.price_per_person,
+			days=excluded.days,
+			min_nights=excluded.min_nights,
+			categories_json=excluded.categories_json,
+			has_hotel=excluded.has_hotel,
+			has_pool=excluded.has_pool,
+			description=excluded.description,
+			review_text=excluded.review_text,
+			review_author=excluded.review_author,
+			rating_value=excluded.rating_value,
+			review_count=excluded.review_count,
+			image=excluded.image,
+			link=excluded.link,
+			updated_at=excluded.updated_at
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, tour := range tours {
+		categoriesJSON, err := json.Marshal(tour.Categories)
+		if err != nil {
+			return err
+		}
+		if _, err := stmt.Exec(
+			tour.ID,
+			firstNonEmpty(tour.Source, "snapshot"),
+			tour.Title,
+			tour.City,
+			tour.Region,
+			tour.Country,
+			tour.VisaStatus,
+			tour.VisaNote,
+			tour.PricePerPerson,
+			tour.Days,
+			tour.MinNights,
+			string(categoriesJSON),
+			tour.HasHotel,
+			tour.HasPool,
+			tour.Description,
+			tour.ReviewText,
+			tour.ReviewAuthor,
+			tour.RatingValue,
+			tour.ReviewCount,
+			tour.Image,
+			tour.Link,
+			now,
+		); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	tx = nil
+	return nil
+}
+
+func (app *App) queueToursDBSave(tours []Tour, isPartial bool) {
+	if app.db == nil || !app.toursTableReady {
+		return
+	}
+	if isPartial {
+		return
+	}
+	if len(tours) == 0 {
+		return
+	}
+	app.mu.Lock()
+	if time.Since(app.lastToursDBSave) < 15*time.Second {
+		app.mu.Unlock()
+		return
+	}
+	app.lastToursDBSave = time.Now().UTC()
+	app.mu.Unlock()
+
+	snapshot := make([]Tour, len(tours))
+	copy(snapshot, tours)
+	go func() {
+		if err := app.saveToursToDatabase(snapshot); err != nil {
+			log.Printf("tours db save failed: %v", err)
+		}
+	}()
 }
 
 func (app *App) readRefreshStatus() refreshStatus {
@@ -929,6 +1111,10 @@ func (app *App) syncSnapshotIfChanged() refreshStatus {
 	app.queryMu.Lock()
 	clear(app.queryCache)
 	app.queryMu.Unlock()
+	app.mu.RLock()
+	currentTours := app.tours
+	app.mu.RUnlock()
+	app.queueToursDBSave(currentTours, isPartial)
 	return status
 }
 
@@ -1043,6 +1229,29 @@ func (app *App) handleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 	status := app.syncSnapshotIfChanged()
 	cacheHits, cacheMisses, cacheSize := app.queryCacheMetrics()
+	dbCounts := map[string]any{
+		"dbConnected": app.db != nil,
+		"dbError":     "",
+		"dbTours":     -1,
+		"dbBookings":  -1,
+		"dbUsers":     -1,
+	}
+	if app.db == nil {
+		dbCounts["dbError"] = "database not configured"
+	} else {
+		var toursCount, bookingsCount, usersCount int
+		if err := app.db.QueryRow(`SELECT COUNT(1) FROM tours`).Scan(&toursCount); err != nil {
+			dbCounts["dbError"] = err.Error()
+		} else if err := app.db.QueryRow(`SELECT COUNT(1) FROM bookings`).Scan(&bookingsCount); err != nil {
+			dbCounts["dbError"] = err.Error()
+		} else if err := app.db.QueryRow(`SELECT COUNT(1) FROM users`).Scan(&usersCount); err != nil {
+			dbCounts["dbError"] = err.Error()
+		} else {
+			dbCounts["dbTours"] = toursCount
+			dbCounts["dbBookings"] = bookingsCount
+			dbCounts["dbUsers"] = usersCount
+		}
+	}
 	app.mu.RLock()
 	refreshNote := app.refreshNote
 	if status.RefreshNote != "" {
@@ -1062,6 +1271,11 @@ func (app *App) handleHealth(w http.ResponseWriter, r *http.Request) {
 		"refreshStage":        firstNonEmpty(status.RefreshStage, "idle"),
 		"refreshTargetCount":  maxInt(status.RefreshTargetCount, len(app.tours)),
 		"refreshCurrentCount": maxInt(status.RefreshCurrentCount, len(app.tours)),
+		"dbConnected":         dbCounts["dbConnected"],
+		"dbError":             dbCounts["dbError"],
+		"dbTours":             dbCounts["dbTours"],
+		"dbBookings":          dbCounts["dbBookings"],
+		"dbUsers":             dbCounts["dbUsers"],
 	}
 	app.mu.RUnlock()
 	writeJSON(w, http.StatusOK, payload)
@@ -1905,6 +2119,7 @@ type Query struct {
 	Categories     []string
 	City           string
 	Query          string
+	Visa           string
 	Sort           string
 	Limit          int
 	Offset         int
@@ -1922,6 +2137,7 @@ func buildQuery(values map[string][]string) Query {
 		Categories:     normalizeCategories(values["category"]),
 		City:           norm(strings.TrimSpace(firstValue(values, "city"))),
 		Query:          strings.TrimSpace(firstValue(values, "q")),
+		Visa:           strings.TrimSpace(firstValue(values, "visa")),
 		Sort:           sortValue,
 		Limit:          clampInt(parseIntDefault(firstValue(values, "limit"), 50), 1, 200),
 		Offset:         maxInt(parseIntDefault(firstValue(values, "offset"), 0), 0),
@@ -2057,6 +2273,9 @@ func (app *App) filteredIndices(index *catalogIndex, tours []Tour, query Query, 
 		if query.MaxPrice != nil && tour.PricePerPerson > *query.MaxPrice {
 			continue
 		}
+		if query.Visa != "" && tour.VisaStatus != query.Visa {
+			continue
+		}
 		if query.City != "" && compiled.cityNorm != query.City {
 			continue
 		}
@@ -2133,6 +2352,7 @@ func queryHasNoFilters(query Query) bool {
 		query.MaxPrice == nil &&
 		query.City == "" &&
 		query.Query == "" &&
+		query.Visa == "" &&
 		len(query.Categories) == 0
 }
 
@@ -2218,6 +2438,8 @@ func queryCacheKey(query Query, generation uint64) string {
 	builder.WriteString(query.City)
 	builder.WriteString("|q=")
 	builder.WriteString(norm(query.Query))
+	builder.WriteString("|visa=")
+	builder.WriteString(query.Visa)
 	builder.WriteString("|sort=")
 	builder.WriteString(query.Sort)
 	builder.WriteString("|cat=")
