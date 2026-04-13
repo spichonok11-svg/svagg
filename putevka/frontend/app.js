@@ -505,10 +505,6 @@ function App() {
   const [detailData, setDetailData] = useState(null);
   const [detailError, setDetailError] = useState("");
   const [isDetailLoading, setIsDetailLoading] = useState(false);
-  const [bookingForm, setBookingForm] = useState({ customerName: "", phone: "", email: "", comment: "" });
-  const [bookingError, setBookingError] = useState("");
-  const [bookingSuccess, setBookingSuccess] = useState("");
-  const [isBookingPending, setIsBookingPending] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState("login");
   const [authForm, setAuthForm] = useState({ username: "", password: "", confirmPassword: "" });
@@ -696,8 +692,6 @@ function App() {
         setDetailModalTour(null);
         setDetailData(null);
         setDetailError("");
-        setBookingError("");
-        setBookingSuccess("");
         setIsAuthModalOpen(false);
         setAuthError("");
       }
@@ -844,9 +838,6 @@ function App() {
     setDetailModalTour(null);
     setDetailData(null);
     setDetailError("");
-    setBookingError("");
-    setBookingSuccess("");
-    setIsBookingPending(false);
   };
   const closeReviews = () => { setReviewModalTour(null); setReviewItems([]); setReviewsError(""); };
   const openAuthModal = (mode = "login") => { setAuthMode(mode); setAuthError(""); setIsAuthModalOpen(true); };
@@ -857,9 +848,6 @@ function App() {
     setDetailModalTour(tour);
     setDetailData(null);
     setDetailError("");
-    setBookingError("");
-    setBookingSuccess("");
-    setBookingForm((prev) => ({ ...prev, comment: "" }));
     setIsDetailLoading(true);
     try {
       const params = new URLSearchParams();
@@ -894,53 +882,6 @@ function App() {
       setReviewsError(reviewsLoadError.message || (localeMode === "ru" ? "Не удалось загрузить отзывы" : "Could not load reviews"));
     } finally {
       setIsReviewsLoading(false);
-    }
-  }
-
-  async function submitBooking(event) {
-    event.preventDefault();
-    if (!detailModalTour) return;
-    const customerName = String(bookingForm.customerName || "").trim();
-    const phone = String(bookingForm.phone || "").trim();
-    const email = String(bookingForm.email || "").trim();
-    const comment = String(bookingForm.comment || "").trim();
-    if (!customerName || !phone) {
-      setBookingError(localeMode === "ru" ? "Заполните имя и телефон." : "Fill name and phone.");
-      return;
-    }
-
-    setIsBookingPending(true);
-    setBookingError("");
-    setBookingSuccess("");
-    try {
-      const response = await fetch("/api/bookings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tourId: detailModalTour.id,
-          link: detailModalTour.link,
-          title: detailModalTour.title,
-          city: detailModalTour.city,
-          region: detailModalTour.region,
-          pricePerPerson: Number(detailModalTour.pricePerPerson || detailData?.prices?.[0]?.price || 0),
-          nights: planner.nights,
-          people: planner.people,
-          customerName,
-          phone,
-          email,
-          comment,
-        }),
-      });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok) {
-        throw new Error(payload.message || (localeMode === "ru" ? "Не удалось сохранить бронь" : "Could not save booking"));
-      }
-      setBookingSuccess(localeMode === "ru" ? "Бронь сохранена. Мы получили заявку." : "Booking saved. We received the request.");
-      setBookingForm({ customerName: "", phone: "", email: "", comment: "" });
-    } catch (bookingRequestError) {
-      setBookingError(bookingRequestError.message || (localeMode === "ru" ? "Не удалось сохранить бронь" : "Could not save booking"));
-    } finally {
-      setIsBookingPending(false);
     }
   }
 
@@ -1202,10 +1143,10 @@ function App() {
                   </div>
                   <aside className="detail-layout__aside">
                     <section className="detail-section detail-section--booking">
-                      <span className="detail-booking__eyebrow">${localeMode === "ru" ? "бронь на сайте" : "booking on site"}</span>
+                      <span className="detail-booking__eyebrow">${localeMode === "ru" ? "информация" : "details"}</span>
                       <div className="detail-booking__top">
-                        <h4>${localeMode === "ru" ? "Забронировать" : "Book now"}</h4>
-                        <div className="detail-booking__badge">${localeMode === "ru" ? "в базу" : "to database"}</div>
+                        <h4>${localeMode === "ru" ? "Детали поездки" : "Trip details"}</h4>
+                        <div className="detail-booking__badge">${localeMode === "ru" ? "без оплаты" : "no payments"}</div>
                       </div>
                       <div className="detail-booking__meta">
                         <span>${planner.nights} ${localeMode === "ru" ? "ночей" : "nights"}</span>
@@ -1213,19 +1154,11 @@ function App() {
                         <strong>${formatMoney((Number(detailModalTour.pricePerPerson || detailData?.prices?.[0]?.price || 0) * Math.max(planner.people, 1)) || 0)}</strong>
                       </div>
                       ${detailModalTour?.visaStatus ? html`<div className=${`detail-visa detail-visa--${detailModalTour.visaStatus}`}>${formatVisaLabel(detailModalTour, localeMode)}</div>` : null}
-                      <form className="auth-form detail-booking-form" onSubmit=${submitBooking}>
                       ${detailModalTour?.visaNote ? html`<div className="detail-visa__note">${detailModalTour.visaNote}</div>` : null}
-                        <label className="auth-form__field"><span>${localeMode === "ru" ? "Имя" : "Name"}</span><input value=${bookingForm.customerName} onInput=${(event) => setBookingForm((prev) => ({ ...prev, customerName: event.target.value }))} placeholder=${localeMode === "ru" ? "Как к вам обращаться" : "Your name"} /></label>
-                        <label className="auth-form__field"><span>${localeMode === "ru" ? "Телефон" : "Phone"}</span><input value=${bookingForm.phone} onInput=${(event) => setBookingForm((prev) => ({ ...prev, phone: event.target.value }))} placeholder=${localeMode === "ru" ? "+7..." : "+7..."} /></label>
-                        <label className="auth-form__field"><span>Email</span><input value=${bookingForm.email} onInput=${(event) => setBookingForm((prev) => ({ ...prev, email: event.target.value }))} placeholder="mail@example.com" /></label>
-                        <label className="auth-form__field"><span>${localeMode === "ru" ? "Комментарий" : "Comment"}</span><textarea rows="4" value=${bookingForm.comment} onInput=${(event) => setBookingForm((prev) => ({ ...prev, comment: event.target.value }))} placeholder=${localeMode === "ru" ? "Пожелания по брони" : "Booking notes"}></textarea></label>
-                        ${bookingError ? html`<div className="modal-card__notice modal-card__notice--error">${bookingError}</div>` : null}
-                        ${bookingSuccess ? html`<div className="modal-card__notice">${bookingSuccess}</div>` : null}
-                        <div className="detail-actions">
-                          <button className="action-button action-button--primary" type="submit" disabled=${isBookingPending}>${isBookingPending ? (localeMode === "ru" ? "сохраняем..." : "saving...") : (localeMode === "ru" ? "забронировать" : "book")}</button>
-                          <button className="action-button action-button--ghost" type="button" onClick=${() => openTourLink(detailModalTour.link)}>${copy.open}</button>
-                        </div>
-                      </form>
+                      <div className="detail-actions">
+                        <button className="action-button action-button--primary" type="button" onClick=${(event) => openReviews(event, detailModalTour)}>${copy.reviewButton}</button>
+                        <button className="action-button action-button--ghost" type="button" onClick=${() => openTourLink(detailModalTour.link)}>${copy.open}</button>
+                      </div>
                     </section>
                   </aside>
                 </div>` : null}
