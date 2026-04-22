@@ -1,0 +1,52 @@
+{
+  "activateSkinCapeForUserVersion": false,
+  "skipHashsumValidation": false,
+  "additionalFiles": [
+    {
+      "sha1": "f9240aaa50a06c04d8e285772ba16a340ddc5aef",
+      "size": 8288387,
+      "path": "libraries/net/minecraft/client/1.21.11/client-1.21.11-mappings.tsrg",
+      "url": "http://res.tlauncher.org/unb/libraries/cache/net/minecraft/client/1.21.11/client-1.21.11-mappings.tsrg"
+    },
+    {
+      "sha1": "30a7252f08508f83ddcafa39883fabd77596df72",
+      "size": 32228566,
+      "path": "libraries/net/minecraft/client/1.21.11/client-1.21.11-official.jar",
+      "url": "http://res.tlauncher.org/unb/libraries/cache/net/minecraft/client/1.21.11/client-1.21.11-official.jar"
+    },
+    {
+      "sha1": "300c9c221442c92861e73be39f2f598faf2f4c0c",
+      "size": 16173,
+      "path": "libraries/net/minecraftforge/forge/1.21.11-61.0.8/forge-1.21.11-61.0.8-shim.jar",
+      "url": "http://res.tlauncher.org/unb/libraries/cache/net/minecraftforge/forge/1.21.11-61.0.8/forge-1.21.11-61.0.8-shim.jar"
+    },
+    {
+      "sha1": "ea9ba99f3ca09b07a6faca6bd8f0097ddcce2aac",
+      "size": 128228,
+      "path": "libraries/net/minecraftforge/fmlcore/1.21.11-61.0.8/fmlcore-1.21.11-61.0.8.jar",
+      "url": "http://res.tlauncher.org/unb/libraries/cache/net/minecraftforge/fmlcore/1.21.11-61.0.8/fmlcore-1.21.11-61.0.8.jar"
+    },
+    {
+      "sha1": "43e9a43bbde85daa63cd27628881fe23bf46ad0f",
+      "size": 27044,
+      "path": "libraries/net/minecraftforge/javafmllanguage/1.21.11-61.0.8/javafmllanguage-1.21.11-61.0.8.jar",
+      "url": "http://res.tlauncher.org/unb/libraries/cache/net/minecraftforge/javafmllanguage/1.21.11-61.0.8/javafmllanguage-1.21.11-61.0.8.jar"
+    },
+    {
+      "sha1": "4ea358216c840a428c83f1aee2b9ffbc60daa9dd",
+      "size": 4820,
+      "path": "libraries/net/minecraftforge/mclanguage/1.21.11-61.0.8/mclanguage-1.21.11-61.0.8.jar",
+      "url": "http://res.tlauncher.org/unb/libraries/cache/net/minecraftforge/mclanguage/1.21.11-61.0.8/mclanguage-1.21.11-61.0.8.jar"
+    },
+    {
+      "sha1": "cd2c65e3e3f1e0f89d37c7444e41a8fd1573a7c7",
+      "size": 7179,
+      "path": "libraries/net/minecraftforge/lowcodelanguage/1.21.11-61.0.8/lowcodelanguage-1.21.11-61.0.8.jar",
+      "url": "http://res.tlauncher.org/unb/libraries/cache/net/minecraftforge/lowcodelanguage/1.21.11-61.0.8/lowcodelanguage-1.21.11-61.0.8.jar"
+    }
+  ],
+  "tlauncherVersion": 0,
+  "source": "local_version_repo",
+  "skinVersion": false,
+  "updatedTime": "2025-12-09T12:13:31+03:00"
+}

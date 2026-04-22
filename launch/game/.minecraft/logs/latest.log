@@ -1,0 +1,100 @@
+[21апр.2026 16:47:38.203] [main/INFO] [cpw.mods.modlauncher.Launcher/MODLAUNCHER]: ModLauncher running: args [--username, ne3it, --version, Forge-1.21.11, --gameDir, D:\launch\game\.minecraft, --assetsDir, D:\launch\game\.minecraft\assets, --assetIndex, 29, --uuid, 8614f9a3029b4813a3d263f0507840cd, --accessToken, **********, --clientId, 0, --xuid, 0, --versionType, release, --launchTarget, forge_client]
+[21апр.2026 16:47:38.207] [main/INFO] [cpw.mods.modlauncher.Launcher/MODLAUNCHER]: JVM identified as Microsoft OpenJDK 64-Bit Server VM 21.0.7+6-LTS
+[21апр.2026 16:47:38.208] [main/INFO] [cpw.mods.modlauncher.Launcher/MODLAUNCHER]: ModLauncher 10.2.4 starting: java version 21.0.7 by Microsoft; OS Windows 10 arch amd64 version 10.0
+[21апр.2026 16:47:38.428] [main/INFO] [net.minecraftforge.fml.loading.ImmediateWindowHandler/]: Loading ImmediateWindowProvider fmlearlywindow
+[21апр.2026 16:47:38.660] [main/INFO] [EARLYDISPLAY/]: Trying GL version 4.6
+[21апр.2026 16:47:39.056] [main/INFO] [EARLYDISPLAY/]: Requested GL version 4.6 got version 4.6
+[21апр.2026 16:47:39.303] [main/INFO] [mixin/]: SpongePowered MIXIN Subsystem Version=0.8.7 Source=jar:file:///D:/launch/game/.minecraft/libraries/org/spongepowered/mixin/0.8.7/mixin-0.8.7.jar!/ Service=ModLauncher Env=CLIENT
+[21апр.2026 16:47:39.768] [EarlyDisplay/INFO] [EARLYDISPLAY/]: GL info: NVIDIA GeForce GTX 1060 3GB/PCIe/SSE2 GL version 4.6.0 NVIDIA 582.28, NVIDIA Corporation
+[21апр.2026 16:47:40.116] [main/INFO] [net.minecraftforge.fml.loading.moddiscovery.JarInJarDependencyLocator/]: No dependencies to load found. Skipping!
+[21апр.2026 16:47:40.675] [main/INFO] [cpw.mods.modlauncher.LaunchServiceHandler/MODLAUNCHER]: Launching target 'forge_client' with arguments [--version, Forge-1.21.11, --gameDir, D:\launch\game\.minecraft, --assetsDir, D:\launch\game\.minecraft\assets, --uuid, 8614f9a3029b4813a3d263f0507840cd, --username, ne3it, --assetIndex, 29, --accessToken, **********, --clientId, 0, --xuid, 0, --versionType, release]
+[21апр.2026 16:47:44.449] [Datafixer Bootstrap/INFO] [com.mojang.datafixers.DataFixerBuilder/]: 287 Datafixer optimizations took 1668 milliseconds
+[21апр.2026 16:47:52.468] [Render thread/INFO] [com.mojang.authlib.yggdrasil.YggdrasilAuthenticationService/]: Environment: Environment[sessionHost=https://sessionserver.mojang.com, servicesHost=https://api.minecraftservices.com, profilesHost=https://api.mojang.com, name=PROD]
+[21апр.2026 16:47:52.489] [Render thread/INFO] [net.minecraft.client.Minecraft/]: Setting user: ne3it
+[21апр.2026 16:47:52.664] [Render thread/INFO] [net.minecraft.client.Minecraft/]: Backend library: LWJGL version 3.3.3+5
+[21апр.2026 16:47:52.665] [Render thread/WARN] [net.minecraft.client.Minecraft/]: Detected unexpected shutdown during last game startup: resetting fullscreen mode
+[21апр.2026 16:47:52.975] [Render thread/INFO] [net.minecraft.client.Minecraft/]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access, GL_EXT_texture_filter_anisotropic
+[21апр.2026 16:47:53.262] [modloading-worker-0/INFO] [net.minecraftforge.common.ForgeMod/FORGEMOD]: Forge mod loading, version 61.0.8, for MC 1.21.11 with MCP 20251223.124241
+[21апр.2026 16:47:53.264] [modloading-worker-0/INFO] [net.minecraftforge.common.MinecraftForge/FORGE]: MinecraftForge v61.0.8 Initialized
+[21апр.2026 16:47:53.282] [modloading-worker-0/INFO] [net.minecraftforge.common.ForgeMod/FORGEMOD]: Opening jdk.naming.dns/com.sun.jndi.dns to java.naming
+[21апр.2026 16:47:54.154] [Render thread/WARN] [net.minecraftforge.client.gui.overlay.ForgeLayeredDraw/]: Expected layer minecraft:potion_effects was not found in stack minecraft:vanilla_root, no layer modifications have been made.
+[21апр.2026 16:47:54.295] [Render thread/INFO] [net.minecraft.server.packs.resources.ReloadableResourceManager/]: Reloading ResourceManager: vanilla, mod_resources
+[21апр.2026 16:47:54.714] [Download-1/INFO] [com.mojang.realmsclient.client.RealmsClient/]: Could not authorize you against Realms server: java.lang.RuntimeException: Failed to parse into SignedJWT: 0
+[21апр.2026 16:47:54.715] [Download-1/ERROR] [com.mojang.realmsclient.client.RealmsClient/]: Failed to fetch Realms feature flags
+com.mojang.realmsclient.exception.RealmsServiceException: Realms authentication error with message 'java.lang.RuntimeException: Failed to parse into SignedJWT: 0'
+	at TRANSFORMER/minecraft@1.21.11/com.mojang.realmsclient.client.RealmsClient.execute(RealmsClient.java:526) ~[forge-1.21.11-61.0.8-client.jar!/:?]
+	at TRANSFORMER/minecraft@1.21.11/com.mojang.realmsclient.client.RealmsClient.fetchFeatureFlags(RealmsClient.java:186) ~[forge-1.21.11-61.0.8-client.jar!/:?]
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1768) ~[?:?]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144) ~[?:?]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642) ~[?:?]
+	at java.base/java.lang.Thread.run(Thread.java:1583) [?:?]
+[21апр.2026 16:47:55.089] [Worker-Main-2/INFO] [net.minecraft.client.gui.font.providers.UnihexProvider/]: Found unifont_all_no_pua-17.0.01.hex, loading
+[21апр.2026 16:47:55.089] [Worker-Main-1/INFO] [net.minecraft.client.gui.font.providers.UnihexProvider/]: Found unifont_pua-17.0.01.hex, loading
+[21апр.2026 16:47:55.669] [Worker-Main-2/INFO] [net.minecraft.client.gui.font.providers.UnihexProvider/]: Found unifont_jp_patch-17.0.01.hex, loading
+[21апр.2026 16:47:56.468] [Worker-Main-3/INFO] [voicechat/]: [voicechat] Compatibility version 20
+[21апр.2026 16:47:56.557] [Worker-Main-3/INFO] [voicechat/]: [voicechat] Loading plugins
+[21апр.2026 16:47:56.561] [Worker-Main-3/INFO] [voicechat/]: [voicechat] Loaded 0 plugin(s)
+[21апр.2026 16:47:56.561] [Worker-Main-3/INFO] [voicechat/]: [voicechat] Initializing plugins
+[21апр.2026 16:47:56.563] [Worker-Main-3/INFO] [voicechat/]: [voicechat] Initialized 0 plugin(s)
+[21апр.2026 16:47:56.698] [Forge Version Check/INFO] [net.minecraftforge.fml.VersionChecker/]: [voicechat] Starting version check at https://update.maxhenkel.de/forge/voicechat
+[21апр.2026 16:47:56.763] [Worker-Main-1/INFO] [voicechat/]: [voicechat] Successfully migrated config voicechat-client.toml
+[21апр.2026 16:47:56.797] [Worker-Main-1/INFO] [voicechat/]: [voicechat] Initializing Opus
+[21апр.2026 16:47:57.104] [Worker-Main-1/INFO] [voicechat/]: [voicechat] Successfully initialized Opus
+[21апр.2026 16:47:57.107] [Worker-Main-1/INFO] [voicechat/]: [voicechat] Initializing RNNoise
+[21апр.2026 16:47:57.261] [Worker-Main-1/INFO] [voicechat/]: [voicechat] Successfully initialized RNNoise
+[21апр.2026 16:47:57.263] [Worker-Main-1/INFO] [voicechat/]: [voicechat] Initializing Speex
+[21апр.2026 16:47:57.480] [Worker-Main-1/INFO] [voicechat/]: [voicechat] Successfully initialized Speex
+[21апр.2026 16:47:57.481] [Worker-Main-1/INFO] [voicechat/]: [voicechat] Initializing LAME
+[21апр.2026 16:47:57.580] [Forge Version Check/INFO] [net.minecraftforge.fml.VersionChecker/]: [voicechat] Found status: BETA Current: 1.21.11-2.6.16 Target: 1.21.11-2.6.16
+[21апр.2026 16:47:57.606] [Forge Version Check/INFO] [net.minecraftforge.fml.VersionChecker/]: [forge] Starting version check at https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json
+[21апр.2026 16:47:57.622] [Worker-Main-1/INFO] [voicechat/]: [voicechat] Successfully initialized LAME
+[21апр.2026 16:47:57.969] [Forge Version Check/INFO] [net.minecraftforge.fml.VersionChecker/]: [forge] Found status: OUTDATED Current: 61.0.8 Target: 61.1.0
+[21апр.2026 16:48:00.881] [Render thread/INFO] [com.mojang.blaze3d.audio.Library/]: OpenAL initialized on device OpenAL Soft on Динамики (USB Audio B2)
+[21апр.2026 16:48:00.885] [Render thread/INFO] [net.minecraft.client.sounds.SoundEngine/SOUNDS]: Sound engine started
+[21апр.2026 16:48:00.927] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
+[21апр.2026 16:48:00.994] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 128x128x0 minecraft:textures/atlas/decorated_pot.png-atlas
+[21апр.2026 16:48:01.014] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
+[21апр.2026 16:48:01.074] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
+[21апр.2026 16:48:01.091] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 1024x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
+[21апр.2026 16:48:01.095] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 2048x2048x4 minecraft:textures/atlas/blocks.png-atlas
+[21апр.2026 16:48:01.256] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 512x512x0 minecraft:textures/atlas/chest.png-atlas
+[21апр.2026 16:48:01.260] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 256x128x0 minecraft:textures/atlas/celestials.png-atlas
+[21апр.2026 16:48:01.263] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 1024x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
+[21апр.2026 16:48:01.271] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 512x512x0 minecraft:textures/atlas/beds.png-atlas
+[21апр.2026 16:48:01.285] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 1024x512x0 minecraft:textures/atlas/items.png-atlas
+[21апр.2026 16:48:01.330] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 1024x1024x0 minecraft:textures/atlas/gui.png-atlas
+[21апр.2026 16:48:01.378] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 128x64x0 minecraft:textures/atlas/map_decorations.png-atlas
+[21апр.2026 16:48:01.389] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 512x256x0 minecraft:textures/atlas/signs.png-atlas
+[21апр.2026 16:48:01.393] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 512x512x0 minecraft:textures/atlas/shulker_boxes.png-atlas
+[21апр.2026 16:48:06.887] [IO-Worker-1/INFO] [com.mojang.realmsclient.client.RealmsClient/]: Could not authorize you against Realms server: java.lang.RuntimeException: Failed to parse into SignedJWT: 0
+[21апр.2026 16:48:06.887] [IO-Worker-1/ERROR] [com.mojang.realmsclient.RealmsAvailability/]: Couldn't connect to realms
+com.mojang.realmsclient.exception.RealmsServiceException: Realms authentication error with message 'java.lang.RuntimeException: Failed to parse into SignedJWT: 0'
+	at TRANSFORMER/minecraft@1.21.11/com.mojang.realmsclient.client.RealmsClient.execute(RealmsClient.java:526) ~[forge-1.21.11-61.0.8-client.jar!/:?]
+	at TRANSFORMER/minecraft@1.21.11/com.mojang.realmsclient.client.RealmsClient.clientCompatible(RealmsClient.java:307) ~[forge-1.21.11-61.0.8-client.jar!/:?]
+	at TRANSFORMER/minecraft@1.21.11/com.mojang.realmsclient.RealmsAvailability.lambda$check$0(RealmsAvailability.java:48) ~[forge-1.21.11-61.0.8-client.jar!/:?]
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1768) ~[?:?]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144) ~[?:?]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642) ~[?:?]
+	at java.base/java.lang.Thread.run(Thread.java:1583) [?:?]
+[21апр.2026 16:48:55.214] [Render thread/INFO] [net.minecraft.server.packs.resources.ReloadableResourceManager/]: Reloading ResourceManager: vanilla, mod_resources
+[21апр.2026 16:48:55.649] [Worker-Main-2/INFO] [net.minecraft.client.gui.font.providers.UnihexProvider/]: Found unifont_all_no_pua-17.0.01.hex, loading
+[21апр.2026 16:48:55.651] [Worker-Main-3/INFO] [net.minecraft.client.gui.font.providers.UnihexProvider/]: Found unifont_pua-17.0.01.hex, loading
+[21апр.2026 16:48:55.982] [Worker-Main-2/INFO] [net.minecraft.client.gui.font.providers.UnihexProvider/]: Found unifont_jp_patch-17.0.01.hex, loading
+[21апр.2026 16:48:56.996] [Render thread/INFO] [com.mojang.blaze3d.audio.Library/]: OpenAL initialized on device OpenAL Soft on Динамики (USB Audio B2)
+[21апр.2026 16:48:56.996] [Render thread/INFO] [net.minecraft.client.sounds.SoundEngine/SOUNDS]: Sound engine started
+[21апр.2026 16:48:56.996] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
+[21апр.2026 16:48:57.004] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 128x128x0 minecraft:textures/atlas/decorated_pot.png-atlas
+[21апр.2026 16:48:57.009] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
+[21апр.2026 16:48:57.028] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
+[21апр.2026 16:48:57.049] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 1024x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
+[21апр.2026 16:48:57.052] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 2048x2048x4 minecraft:textures/atlas/blocks.png-atlas
+[21апр.2026 16:48:57.145] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 512x512x0 minecraft:textures/atlas/chest.png-atlas
+[21апр.2026 16:48:57.152] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 256x128x0 minecraft:textures/atlas/celestials.png-atlas
+[21апр.2026 16:48:57.154] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 1024x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
+[21апр.2026 16:48:57.156] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 512x512x0 minecraft:textures/atlas/beds.png-atlas
+[21апр.2026 16:48:57.162] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 1024x512x0 minecraft:textures/atlas/items.png-atlas
+[21апр.2026 16:48:57.180] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 1024x1024x0 minecraft:textures/atlas/gui.png-atlas
+[21апр.2026 16:48:57.208] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 128x64x0 minecraft:textures/atlas/map_decorations.png-atlas
+[21апр.2026 16:48:57.221] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 512x256x0 minecraft:textures/atlas/signs.png-atlas
+[21апр.2026 16:48:57.223] [Render thread/INFO] [net.minecraft.client.renderer.texture.TextureAtlas/]: Created: 512x512x0 minecraft:textures/atlas/shulker_boxes.png-atlas
+[21апр.2026 16:49:46.083] [Render thread/INFO] [net.minecraft.client.Minecraft/]: Stopping!

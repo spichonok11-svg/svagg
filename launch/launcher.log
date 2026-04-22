@@ -1,0 +1,10 @@
+[2026-04-21 15:04:05] powershell -File "D:\launch\scripts\minecraft.ps1" install -Version "Fabric 1.21.11" -RamMb 4000
+Copying Minecraft files into D:\launch\game\.minecraft
+Downloading mod https://minecraft-inside.ru/download/480737/
+Could not download mod: https://minecraft-inside.ru/download/480737/
+“¤ «Ґ­­л© бҐаўҐа ў®§ўа вЁ« ®иЁЎЄг: (403) ‡ ЇаҐйҐ­®.
+Install ready: Fabric 1.21.11
+
+
+ExitCode=0
+

@@ -1,0 +1,1 @@
+﻿D:\launch\game\.minecraft\runtime\java-runtime-delta\windows\java-runtime-delta\bin\java.exe @D:\launch\game\.minecraft\logs\launcher-java.args > D:\launch\game\.minecraft\logs\launcher-java-out.log 2> D:\launch\game\.minecraft\logs\launcher-java-err.log
