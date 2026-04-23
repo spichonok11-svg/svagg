@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -51,6 +51,7 @@ internal sealed class LauncherForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         DoubleBuffered = true;
         Font = new Font("Segoe UI", 10f);
+        Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
 
         BuildUi();
         LoadSettings();
@@ -462,3 +463,5 @@ internal static class ESLauncherWrapper
         }
     }
 }
+
+

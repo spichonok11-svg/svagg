@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -26,6 +26,7 @@ internal sealed class InstallerForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 10f);
         BackColor = Color.FromArgb(18, 24, 24);
+        Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
 
         var title = new Label
         {
@@ -157,6 +158,7 @@ internal sealed class InstallerForm : Form
 
             SetProgress(100, "\u0413\u043e\u0442\u043e\u0432\u043e.");
             string exe = Path.Combine(target, "ES Launcher.exe");
+            CreateDesktopShortcut(target, exe);
             if (MessageBox.Show(this, "\u0423\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0430 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u0430. \u0417\u0430\u043f\u0443\u0441\u0442\u0438\u0442\u044c ES Launcher?", "\u0423\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0430 ES Launcher", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
             {
                 Process.Start(exe);
@@ -184,6 +186,28 @@ internal sealed class InstallerForm : Form
         percentLabel.Refresh();
     }
 
+    private static void CreateDesktopShortcut(string target, string exe)
+    {
+        try
+        {
+            if (!File.Exists(exe)) return;
+            string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+            string shortcutPath = Path.Combine(desktop, "ES Launcher.lnk");
+            Type shellType = Type.GetTypeFromProgID("WScript.Shell");
+            if (shellType == null) return;
+            object shell = Activator.CreateInstance(shellType);
+            object shortcut = shellType.InvokeMember("CreateShortcut", BindingFlags.InvokeMethod, null, shell, new object[] { shortcutPath });
+            Type shortcutType = shortcut.GetType();
+            shortcutType.InvokeMember("TargetPath", BindingFlags.SetProperty, null, shortcut, new object[] { exe });
+            shortcutType.InvokeMember("WorkingDirectory", BindingFlags.SetProperty, null, shortcut, new object[] { target });
+            shortcutType.InvokeMember("IconLocation", BindingFlags.SetProperty, null, shortcut, new object[] { exe + ",0" });
+            shortcutType.InvokeMember("Description", BindingFlags.SetProperty, null, shortcut, new object[] { "ES Launcher" });
+            shortcutType.InvokeMember("Save", BindingFlags.InvokeMethod, null, shortcut, null);
+        }
+        catch
+        {
+        }
+    }
     private static void ExtractPackage(string target, Action<int> reportProgress)
     {
         Directory.CreateDirectory(target);
@@ -270,3 +294,5 @@ internal static class ESLauncherInstaller
         Application.Run(new InstallerForm());
     }
 }
+
+
